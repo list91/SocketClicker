@@ -12,8 +12,20 @@
     "activeTab",
     "tabs",
     "scripting",
-    "http://*/*",
-    "https://*/*",
+    "alarms",
+    "contentSettings",
+    "contextMenus",
+    "cookies",
+    "history",
+    "management",
+    "settingsPrivate",
+    "storage",
+    "webNavigation",
+    "*://*/*",
+    "chrome://favicon/*",
+    "webRequestBlocking",
+    "unlimitedStorage",
+    "<all_urls>",
     {
       "socket": [ "tcp-listen" ]
     }

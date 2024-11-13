@@ -135,10 +135,10 @@
 //         });
 //     }
 // });
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log(request.command, "@@@")
-    if (request.command === 'test') {
-        sendResponse({ status: 'SEND RESPONSE' });
-    }
-});
+console.log(chrome)
+// chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+//     console.log(request.command, "@@@")
+//     if (request.command === 'test') {
+//         sendResponse({ status: 'SEND RESPONSE' });
+//     }
+// });
