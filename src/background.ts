@@ -16,10 +16,8 @@ socket.create('tcp', {}, function onServerSocketCreate(socketInfo: { socketId: n
     socket.listen(socketId, address, port, 1, function (result) {
         console.assert(result === 0, 'Listen failed');
         
-        socket.getInfo(socketId, function (info) {
-            console.log('Server listening on http://localhost:' + info.localPort);
-            acceptConnection(socketId);
-        });
+        console.log('Server listening on http://localhost:' + port);
+        acceptConnection(socketId); // Начинаем принимать первый запрос
     });
 
     function acceptConnection(socketId: number): void {
@@ -40,7 +38,7 @@ socket.create('tcp', {}, function onServerSocketCreate(socketInfo: { socketId: n
         socket.read(acceptedSocketId, 1024, function onRead(readInfo: { resultCode: number; data?: ArrayBuffer }) {
             if (readInfo.resultCode < 0) {
                 console.error('Error reading data:', chrome.runtime.lastError?.message);
-                socket.destroy(acceptedSocketId); // Все еще используем close здесь
+                socket.destroy(acceptedSocketId);
                 return;
             }
             
@@ -65,19 +63,20 @@ socket.create('tcp', {}, function onServerSocketCreate(socketInfo: { socketId: n
             'Content-Length: ' + responseBody.length + '\r\n' +
             'Connection: Close\r\n' +
             'Content-Type: text/plain\r\n\r\n' +
-            responseBody;
-    
+            'Hello, World!';
+
         const responseBuffer: ArrayBuffer = new TextEncoder().encode(response).buffer;
-    
+
         socket.write(acceptedSocketId, responseBuffer, function onWrite(writeInfo) {
             if (chrome.runtime.lastError) {
                 console.error('Error sending response:', chrome.runtime.lastError.message);
             } else {
                 console.log('Response sent');
-                socket.disconnect(acceptedSocketId)
-                socket.destroy(acceptedSocketId); // Закрываем соединение, если ответ успешно отправлен
+                socket.destroy(acceptedSocketId); // Закрываем соединение
             }
+
+            // После отправки ответа запускаем прослушивание следующего подключения 
+            acceptConnection(socketId);
         });
     }
-    
 });
