@@ -4,13 +4,31 @@ export enum CommandType {
     CLICK = 'click',
     INPUT = 'input',
     SCROLL = 'scroll',
-    WAIT = 'wait'
+    WAIT = 'wait',
+    TEST = 'test',
+    
+    // Новые RPA-подобные команды
+    FIND_ELEMENT = 'find',
+    HOVER = 'hover',
+    SELECT = 'select',
+    ASSERT = 'assert',
+    CAPTURE = 'capture',
+    EXECUTE = 'execute',
+    
+    // Команды для работы с вкладками
+    OPEN_TAB = 'openTab',
+    SWITCH_TAB = 'switchTab',
+    CLOSE_TAB = 'closeTab',
+    UPDATE_TAB = 'updateTab'
 }
 
 export interface CommandExecutionResult {
     success: boolean;
     message?: string;
 }
+
+import { RPACommands } from './rpaCommands';
+import { getCurrentTab, activateTab, createTab, getTab, updateUrlForTab } from './tabUtils';
 
 export class CommandExecutor {
     private static extractCommandParts(command: string): { type: string, args: string[] } {
@@ -41,6 +59,43 @@ export class CommandExecutor {
             
             case CommandType.WAIT:
                 return this.handleWait(args);
+            
+            case CommandType.TEST:
+                return this.handleTest(args);
+            
+            case CommandType.FIND_ELEMENT:
+                return RPACommands.findElement(args[0])
+                    .then(element => ({
+                        success: !!element,
+                        message: element ? `Элемент найден: ${args[0]}` : `Элемент не найден: ${args[0]}`
+                    }));
+            
+            case CommandType.HOVER:
+                return RPACommands.handleHover(args[0]);
+            
+            case CommandType.SELECT:
+                return RPACommands.handleSelect(args[0], args[1]);
+            
+            case CommandType.ASSERT:
+                return RPACommands.handleAssert(args[0], args[1]);
+            
+            case CommandType.CAPTURE:
+                return RPACommands.handleCapture(args[0]);
+            
+            case CommandType.EXECUTE:
+                return RPACommands.handleExecute(args.join(' '));
+            
+            case CommandType.OPEN_TAB:
+                return this.handleOpenTab(args);
+            
+            case CommandType.SWITCH_TAB:
+                return this.handleSwitchTab(args);
+            
+            case CommandType.CLOSE_TAB:
+                return this.handleCloseTab(args);
+            
+            case CommandType.UPDATE_TAB:
+                return this.handleUpdateTab(args);
             
             default:
                 return {
@@ -207,6 +262,121 @@ export class CommandExecutor {
             return {
                 success: false,
                 message: `Ошибка при ожидании: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handleTest(args: string[]): Promise<CommandExecutionResult> {
+        try {
+            const url = args[0] || 'https://example.com'; // Если URL не указан, используем example.com
+            const tab = await createTab(url);
+            
+            return {
+                success: true,
+                message: `Тестовая вкладка создана с URL: ${url}`
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при создании тестовой вкладки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handleOpenTab(args: string[]): Promise<CommandExecutionResult> {
+        if (args.length < 1) {
+            return {
+                success: false,
+                message: 'Не указан URL для новой вкладки'
+            };
+        }
+
+        try {
+            const url = args[0];
+            const tab = await createTab(url);
+            
+            return {
+                success: true,
+                message: `Открыта новая вкладка с URL: ${url}`
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при открытии вкладки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handleSwitchTab(args: string[]): Promise<CommandExecutionResult> {
+        if (args.length < 1) {
+            return {
+                success: false,
+                message: 'Не указан ID вкладки'
+            };
+        }
+
+        try {
+            const tabId = parseInt(args[0], 10);
+            const focusWindow = args[1] === 'true';
+            
+            await activateTab(tabId, focusWindow);
+            return {
+                success: true,
+                message: `Переключено на вкладку ${tabId}`
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при переключении вкладки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handleCloseTab(args: string[]): Promise<CommandExecutionResult> {
+        if (args.length < 1) {
+            return {
+                success: false,
+                message: 'Не указан ID вкладки'
+            };
+        }
+
+        try {
+            const tabId = parseInt(args[0], 10);
+            await chrome.tabs.remove(tabId);
+            
+            return {
+                success: true,
+                message: `Закрыта вкладка ${tabId}`
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при закрытии вкладки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handleUpdateTab(args: string[]): Promise<CommandExecutionResult> {
+        if (args.length < 2) {
+            return {
+                success: false,
+                message: 'Не указан ID вкладки или новый URL'
+            };
+        }
+
+        try {
+            const tabId = parseInt(args[0], 10);
+            const url = args[1];
+            
+            await updateUrlForTab(tabId, url);
+            return {
+                success: true,
+                message: `Обновлен URL вкладки ${tabId}`
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при обновлении вкладки: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
             };
         }
     }
