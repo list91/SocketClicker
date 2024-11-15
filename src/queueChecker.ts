@@ -1,84 +1,64 @@
+import { setBadgeText } from './common';
+import { CommandExecutor } from './commandExecutor';
+
+const SERVER_BASE_URL = 'http://localhost:5000';
+
 interface Command {
     id: string;
     command: string;
     time_created: string;
 }
 
-enum CommandType {
-    CLICK = 'click',
-    INPUT = 'input',
-    SCROLL = 'scroll',
-    WAIT = 'wait'
-}
-
-interface QueueResponse {
-    status: string;
-    commands: Command[];
-}
-
-const SERVER_BASE_URL = 'http://localhost:5000';
-
-export async function checkQueueStatus(): Promise<void> {
+export async function checkQueueStatus() {
     try {
-        // Получаем первую команду
-        const readResponse = await fetch(`${SERVER_BASE_URL}/read_first?count=1`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(5000)
-        });
-
-        if (!readResponse.ok) {
-            console.error(`Server responded with status: ${readResponse.status}`);
+        const response = await fetch(`${SERVER_BASE_URL}/read_first?count=1`);
+        
+        if (!response.ok) {
+            console.error(`Failed to fetch commands. Status: ${response.status}`);
+            setBadgeText(false);
             return;
         }
 
-        const commands: Command[] = await readResponse.json();
+        const commands: Command[] = await response.json();
 
         if (commands.length > 0) {
             const command = commands[0];
             console.log('Received command:', command);
+
+            // Обработка команды с использованием CommandExecutor
+            const result = await CommandExecutor.executeCommand(command.command);
+            
+            // Логирование результата выполнения команды
+            console.log(`Команда "${command.command}":`, result);
+            
+            // Обновление бейджа с результатом
+            setBadgeText(result.success);
 
             // Отправляем команду в историю на том же сервере
             const moveResponse = await fetch(`${SERVER_BASE_URL}/move_to_history`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({ ids: [command.id] })
+                body: JSON.stringify([command])
             });
 
             if (!moveResponse.ok) {
                 console.error(`Failed to move command to history. Status: ${moveResponse.status}`);
+                setBadgeText(false);
                 return;
-            }
-
-            // Выводим содержимое команды в консоль
-            console.log('Command content:', command.command);
-
-            // Простая обработка команд
-            switch (command.command.toLowerCase()) {
-                case 'ping':
-                    console.log('Ping received');
-                    break;
-                case command.command.match(/^echo\s/) && command.command:
-                    console.log('Echo command:', command.command.replace('echo ', ''));
-                    break;
-                default:
-                    console.warn('Неизвестная команда:', command.command);
             }
         } else {
             console.log('No commands in queue');
+            setBadgeText(true);
         }
     } catch (error) {
         if (error instanceof TypeError) {
-            console.error('Network error: Сервер недоступен. Проверьте, запущен ли сервер на localhost:5000');
-        } else if (error instanceof DOMException && error.name === 'AbortError') {
-            console.error('Timeout: Сервер не отвечает в течение 5 секунд');
+            console.error('Network error:', error.message);
+            setBadgeText(false);
         } else {
-            console.error('Unexpected error processing queue:', error);
+            console.error('Unexpected error:', error);
+            setBadgeText(false);
         }
     }
 }
