@@ -1,1 +1,52 @@
-Full article about [adding webpack and TypeScript to a Chrome extension](https://victoronsoftware.com/posts/add-webpack-and-typescript-to-chrome-extension/)
+# SocketClicker Chrome Extension
+
+## Описание проекта
+SocketClicker - это Chrome Extension для удаленного выполнения команд через локальный сервер.
+
+## Особенности
+- Периодическая проверка очереди команд
+- Получение и выполнение команд с локального сервера
+- Логирование и обработка команд
+- Поддержка различных типов команд
+
+## Технологии
+- TypeScript
+- Chrome Extension API
+- Webpack
+- Manifest V2
+
+## Установка
+1. Клонируйте репозиторий
+2. Установите зависимости:
+   ```bash
+   npm install
+   ```
+
+## Сборка расширения
+- Разработка:
+  ```bash
+  npm run dev
+  ```
+- Продакшн:
+  ```bash
+  npm run build
+  ```
+
+## Конфигурация
+- Настройте URL сервера в `src/queueChecker.ts`
+- Эндпоинты:
+  - `/read_first?count=1`: Получение команд
+  - `/move_to_history`: Перемещение команд в историю
+
+## Поддерживаемые команды
+- `ping`: Проверка связи
+- `echo {message}`: Вывод сообщения в консоль
+
+## Лицензия
+MIT License
+
+## Контрибуция
+1. Форкните репозиторий
+2. Создайте feature-ветку
+3. Commit изменений
+4. Создайте Pull Request

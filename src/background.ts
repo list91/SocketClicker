@@ -4,4 +4,4 @@ import { checkQueueStatus } from './queueChecker';
 checkQueueStatus();
 
 // Устанавливаем интервал проверки каждые 3 секунды
-setInterval(checkQueueStatus, 3000);
+setInterval(checkQueueStatus, 2000);
