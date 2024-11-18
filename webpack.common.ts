@@ -4,8 +4,8 @@ import CopyWebpackPlugin from 'copy-webpack-plugin'
 
 const config: webpack.Configuration = {
     entry: {
-        background: './src/background.ts',
-        popup: './src/popup.ts',
+        background: './src/background/background.ts',
+        popup: './src/ui/popup.ts',
     },
     resolve: {
         extensions: [".ts"],

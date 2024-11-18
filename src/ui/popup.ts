@@ -1,4 +1,4 @@
-import {setBadgeText} from "./common"
+import {setBadgeText} from "../core/common"
 
 console.log("Hello, world from popup!")
 

@@ -1,5 +1,5 @@
-import { setBadgeText } from './common';
-import { CommandExecutor } from './commandExecutor';
+import { setBadgeText } from '../core/common';
+import { CommandExecutor } from '../core/commandExecutor';
 
 const SERVER_BASE_URL = 'http://localhost:5000';
 
