@@ -1,10 +1,22 @@
+// Константы для XPath селекторов по типам команд
+const XPATH_SELECTORS = {
+    
+    PUBLICATION: {
+        PUBLISH_BUTTON: '//*[@id="publish-button"]',
+        TEXT_INPUT: '//*[@id="content-input"]',
+        SUBMIT_BUTTON: '//*[@id="submit-button"]',
+        CATEGORY_SELECT: '//*[@id="category-select"]'
+    }
+};
+
 export enum CommandType {
     PING = 'ping',
     ECHO = 'echo',
     CLICK = 'click',
     INPUT = 'input',
     SCROLL = 'scroll',
-    WAIT = 'wait'
+    WAIT = 'wait',
+    PUBLICATION = 'publication'
 }
 
 export interface CommandExecutionResult {
@@ -41,6 +53,9 @@ export class CommandExecutor {
             
             case CommandType.WAIT:
                 return this.handleWait(args);
+
+            case CommandType.PUBLICATION:
+                return this.handlePublication(args);
             
             default:
                 return {
@@ -207,6 +222,90 @@ export class CommandExecutor {
             return {
                 success: false,
                 message: `Ошибка при ожидании: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+            };
+        }
+    }
+
+    private static async handlePublication(args: string[]): Promise<CommandExecutionResult> {
+        if (args.length < 2) {
+            return {
+                success: false,
+                message: 'Требуются аргументы: URL и текст для публикации'
+            };
+        }
+
+        const [url, ...textParts] = args;
+        const text = textParts.join(' ');
+
+        try {
+            // Открываем URL
+            window.location.href = url;
+
+            // Ждем загрузки страницы
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Нажимаем на первую кнопку
+            const publishButton = document.evaluate(
+                XPATH_SELECTORS.PUBLICATION.PUBLISH_BUTTON,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+            ).singleNodeValue as HTMLElement;
+
+            if (!publishButton) {
+                return {
+                    success: false,
+                    message: 'Кнопка публикации не найдена'
+                };
+            }
+            publishButton.click();
+
+            // Ждем появления формы
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Вводим текст
+            const textInput = document.evaluate(
+                XPATH_SELECTORS.PUBLICATION.TEXT_INPUT,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+            ).singleNodeValue as HTMLInputElement;
+
+            if (!textInput) {
+                return {
+                    success: false,
+                    message: 'Поле ввода текста не найдено'
+                };
+            }
+            textInput.value = text;
+
+            // Нажимаем кнопку отправки
+            const submitButton = document.evaluate(
+                XPATH_SELECTORS.PUBLICATION.SUBMIT_BUTTON,
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+            ).singleNodeValue as HTMLElement;
+
+            if (!submitButton) {
+                return {
+                    success: false,
+                    message: 'Кнопка отправки не найдена'
+                };
+            }
+            submitButton.click();
+
+            return {
+                success: true,
+                message: 'Публикация успешно выполнена'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Ошибка при публикации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
             };
         }
     }

@@ -1,13 +1,35 @@
 {
-  "manifest_version": 3,
-  "name": "Link Counter",
+  "manifest_version": 2,
+  "name": "parser",
+  "description": "",
   "version": "1.0",
-  "description": "Counts links on the current tab",
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
+  
   "permissions": [
+    "experimental",
     "activeTab",
-    "scripting"
-  ],
-  "action": {
-    "default_popup": "popup.html"
-  }
+    "tabs",
+    "scripting",
+    "alarms",
+    "contentSettings",
+    "contextMenus",
+    "cookies",
+    "history",
+    "management",
+    "settingsPrivate",
+    "storage",
+    "webNavigation",
+    "*://*/*",
+    "chrome://favicon/*",
+    "webRequestBlocking",
+    "unlimitedStorage",
+    "<all_urls>",
+    {
+      "socket": [ "tcp-listen" ]
+    }
+  ]
 }

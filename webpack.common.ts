@@ -5,7 +5,7 @@ import CopyWebpackPlugin from 'copy-webpack-plugin'
 const config: webpack.Configuration = {
     entry: {
         background: './src/background.ts',
-        popup: './src/popup.ts'
+        popup: './src/popup.ts',
     },
     resolve: {
         extensions: [".ts"],
