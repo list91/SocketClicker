@@ -1,14 +1,8 @@
-// Константы для XPath селекторов по типам команд
-const XPATH_SELECTORS = {
-    
-    PUBLICATION: {
-        PUBLISH_BUTTON: '//*[@id="publish-button"]',
-        TEXT_INPUT: '//*[@id="content-input"]',
-        SUBMIT_BUTTON: '//*[@id="submit-button"]',
-        CATEGORY_SELECT: '//*[@id="category-select"]'
-    }
-};
+import { XPATH_SELECTORS } from '../constants/xpathSelectors';
 
+/**
+ * Типы команд
+ */
 export enum CommandType {
     PING = 'ping',
     ECHO = 'echo',
@@ -19,12 +13,31 @@ export enum CommandType {
     PUBLICATION = 'publication'
 }
 
+/**
+ * Результат выполнения команды
+ */
 export interface CommandExecutionResult {
     success: boolean;
     message?: string;
 }
 
+/**
+ * Параметры команды
+ */
+interface CommandParams {
+    content?: string;
+    [key: string]: any;
+}
+
+/**
+ * Класс для выполнения команд
+ */
 export class CommandExecutor {
+    /**
+     * Извлекает тип и аргументы команды из строки
+     * @param command строка с командой
+     * @returns объект с типом и аргументами команды
+     */
     private static extractCommandParts(command: string): { type: string, args: string[] } {
         const parts = command.trim().split(/\s+/);
         const type = parts[0].toLowerCase();
@@ -32,7 +45,13 @@ export class CommandExecutor {
         return { type, args };
     }
 
-    public static async executeCommand(command: string): Promise<CommandExecutionResult> {
+    /**
+     * Выполняет команду
+     * @param command строка с командой
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    public static async executeCommand(command: string, params?: CommandParams): Promise<CommandExecutionResult> {
         const { type, args } = this.extractCommandParts(command);
 
         switch (type) {
@@ -40,22 +59,22 @@ export class CommandExecutor {
                 return this.handlePing();
             
             case CommandType.ECHO:
-                return this.handleEcho(args);
+                return this.handleEcho(args, params);
             
             case CommandType.CLICK:
-                return this.handleClick(args);
+                return this.handleClick(args, params);
             
             case CommandType.INPUT:
-                return this.handleInput(args);
+                return this.handleInput(args, params);
             
             case CommandType.SCROLL:
-                return this.handleScroll(args);
+                return this.handleScroll(args, params);
             
             case CommandType.WAIT:
-                return this.handleWait(args);
+                return this.handleWait(args, params);
 
             case CommandType.PUBLICATION:
-                return this.handlePublication(args);
+                return this.handlePublication(args, params);
             
             default:
                 return {
@@ -65,6 +84,10 @@ export class CommandExecutor {
         }
     }
 
+    /**
+     * Обрабатывает команду ping
+     * @returns результат выполнения команды
+     */
     private static handlePing(): CommandExecutionResult {
         console.log('Ping received');
         return {
@@ -73,8 +96,14 @@ export class CommandExecutor {
         };
     }
 
-    private static handleEcho(args: string[]): CommandExecutionResult {
-        const message = args.join(' ');
+    /**
+     * Обрабатывает команду echo
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static handleEcho(args: string[], params?: CommandParams): CommandExecutionResult {
+        const message = params?.content || args.join(' ');
         console.log('Echo:', message);
         return {
             success: true,
@@ -82,7 +111,13 @@ export class CommandExecutor {
         };
     }
 
-    private static async handleClick(args: string[]): Promise<CommandExecutionResult> {
+    /**
+     * Обрабатывает команду click
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static async handleClick(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
         if (args.length < 1) {
             return {
                 success: false,
@@ -114,7 +149,13 @@ export class CommandExecutor {
         }
     }
 
-    private static async handleInput(args: string[]): Promise<CommandExecutionResult> {
+    /**
+     * Обрабатывает команду input
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static async handleInput(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
         if (args.length < 2) {
             return {
                 success: false,
@@ -124,7 +165,7 @@ export class CommandExecutor {
 
         try {
             const selector = args[0];
-            const text = args.slice(1).join(' ');
+            const text = params?.content || args.slice(1).join(' ');
             const element = document.querySelector(selector) as HTMLInputElement;
             
             if (!element) {
@@ -150,7 +191,13 @@ export class CommandExecutor {
         }
     }
 
-    private static async handleScroll(args: string[]): Promise<CommandExecutionResult> {
+    /**
+     * Обрабатывает команду scroll
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static async handleScroll(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
         if (args.length < 1) {
             return {
                 success: false,
@@ -194,7 +241,13 @@ export class CommandExecutor {
         }
     }
 
-    private static async handleWait(args: string[]): Promise<CommandExecutionResult> {
+    /**
+     * Обрабатывает команду wait
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static async handleWait(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
         if (args.length < 1) {
             return {
                 success: false,
@@ -226,82 +279,118 @@ export class CommandExecutor {
         }
     }
 
-    private static async handlePublication(args: string[]): Promise<CommandExecutionResult> {
-        if (args.length < 2) {
+    /**
+     * Обрабатывает команду publication
+     * @param args аргументы команды
+     * @param params параметры команды
+     * @returns результат выполнения команды
+     */
+    private static async handlePublication(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
+        const text = params?.content;
+        if (!text) {
             return {
                 success: false,
-                message: 'Требуются аргументы: URL и текст для публикации'
+                message: 'Не указан текст для публикации'
             };
         }
 
-        const [url, ...textParts] = args;
-        const text = textParts.join(' ');
-
         try {
-            // Открываем URL
-            window.location.href = url;
+            // Get active tab
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const tab = tabs[0];
+            if (!tab?.id) {
+                return {
+                    success: false,
+                    message: 'Не найдена активная вкладка'
+                };
+            }
 
-            // Ждем загрузки страницы
+            // Navigate to the start page
+            await chrome.tabs.update(tab.id, { url: XPATH_SELECTORS.PUBLICATION.START_PAGE });
+
+            // Wait for page load
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Нажимаем на первую кнопку
-            const publishButton = document.evaluate(
-                XPATH_SELECTORS.PUBLICATION.PUBLISH_BUTTON,
-                document,
-                null,
-                XPathResult.FIRST_ORDERED_NODE_TYPE,
-                null
-            ).singleNodeValue as HTMLElement;
+            // Execute content script for publication
+            const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (text: string, selectors: typeof XPATH_SELECTORS.PUBLICATION) => {
+                    try {
+                        // Click publish button
+                        const publishButton = document.evaluate(
+                            selectors.PUBLISH_BUTTON,
+                            document,
+                            null,
+                            XPathResult.FIRST_ORDERED_NODE_TYPE,
+                            null
+                        ).singleNodeValue as HTMLElement;
 
-            if (!publishButton) {
+                        if (!publishButton) {
+                            return { success: false, message: 'Кнопка публикации не найдена' } as CommandExecutionResult;
+                        }
+                        publishButton.click();
+
+                        // Wait for form
+                        return new Promise<CommandExecutionResult>(resolve => {
+                            setTimeout(async () => {
+                                try {
+                                    // Input text
+                                    const textInput = document.evaluate(
+                                        selectors.TEXT_INPUT,
+                                        document,
+                                        null,
+                                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                                        null
+                                    ).singleNodeValue as HTMLElement;
+
+                                    if (!textInput) {
+                                        resolve({ success: false, message: 'Поле ввода текста не найдено' });
+                                        return;
+                                    }
+                                    textInput.textContent = text;
+
+                                    // Click submit button
+                                    const submitButton = document.evaluate(
+                                        selectors.SUBMIT_BUTTON,
+                                        document,
+                                        null,
+                                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                                        null
+                                    ).singleNodeValue as HTMLElement;
+
+                                    if (!submitButton) {
+                                        resolve({ success: false, message: 'Кнопка отправки не найдена' });
+                                        return;
+                                    }
+                                    submitButton.click();
+
+                                    resolve({ success: true, message: 'Публикация успешно выполнена' });
+                                } catch (error) {
+                                    resolve({
+                                        success: false,
+                                        message: `Ошибка при выполнении действий: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+                                    });
+                                }
+                            }, 1000);
+                        });
+                    } catch (error) {
+                        return {
+                            success: false,
+                            message: `Ошибка при выполнении действий: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+                        } as CommandExecutionResult;
+                    }
+                },
+                args: [text, XPATH_SELECTORS.PUBLICATION]
+            });
+
+            if (!results || results.length === 0 || !results[0].result) {
                 return {
                     success: false,
-                    message: 'Кнопка публикации не найдена'
+                    message: 'Не удалось выполнить скрипт публикации'
                 };
             }
-            publishButton.click();
 
-            // Ждем появления формы
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Вводим текст
-            const textInput = document.evaluate(
-                XPATH_SELECTORS.PUBLICATION.TEXT_INPUT,
-                document,
-                null,
-                XPathResult.FIRST_ORDERED_NODE_TYPE,
-                null
-            ).singleNodeValue as HTMLInputElement;
-
-            if (!textInput) {
-                return {
-                    success: false,
-                    message: 'Поле ввода текста не найдено'
-                };
-            }
-            textInput.value = text;
-
-            // Нажимаем кнопку отправки
-            const submitButton = document.evaluate(
-                XPATH_SELECTORS.PUBLICATION.SUBMIT_BUTTON,
-                document,
-                null,
-                XPathResult.FIRST_ORDERED_NODE_TYPE,
-                null
-            ).singleNodeValue as HTMLElement;
-
-            if (!submitButton) {
-                return {
-                    success: false,
-                    message: 'Кнопка отправки не найдена'
-                };
-            }
-            submitButton.click();
-
-            return {
-                success: true,
-                message: 'Публикация успешно выполнена'
-            };
+            return results[0].result;
         } catch (error) {
             return {
                 success: false,
