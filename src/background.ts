@@ -120,6 +120,102 @@ const clickElementWithScript = async (tabId: number, xpath: string): Promise<boo
   }
 };
 
+// Функция для проверки наличия элемента
+const waitForElement = async (tabId: number, xpath: string, timeout: number): Promise<boolean> => {
+  const startTime = Date.now();
+  const checkInterval = 100; // Проверяем каждые 100мс
+  let attempts = 0;
+
+  console.log(`[WAIT] Starting to wait for element: ${xpath}`);
+  console.log(`[WAIT] Timeout: ${timeout}ms, Check interval: ${checkInterval}ms`);
+
+  while (Date.now() - startTime < timeout) {
+    attempts++;
+    const elapsedTime = Date.now() - startTime;
+    console.log(`[WAIT] Attempt ${attempts}, Elapsed time: ${elapsedTime}ms`);
+
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (xpath: string) => {
+          try {
+            const element = document.evaluate(
+              xpath,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null
+            ).singleNodeValue;
+            
+            if (element instanceof HTMLElement) {
+              const rect = element.getBoundingClientRect();
+              return {
+                found: true,
+                info: {
+                  tagName: element.tagName,
+                  id: element.id,
+                  className: element.className,
+                  isVisible: element.offsetParent !== null,
+                  position: {
+                    x: rect.x,
+                    y: rect.y,
+                    width: rect.width,
+                    height: rect.height
+                  }
+                }
+              };
+            }
+            return { found: false, info: { reason: 'Element not found or not HTMLElement' } };
+          } catch (error) {
+            return { 
+              found: false, 
+              info: { 
+                reason: 'Error in element search',
+                error: error instanceof Error ? error.message : String(error)
+              } 
+            };
+          }
+        },
+        args: [xpath]
+      });
+
+      // Проверяем, что результаты существуют
+      if (!results || !results[0] || results[0].result === undefined) {
+        console.warn(`[WAIT] Invalid results on attempt ${attempts}:`, results);
+        return false;
+      }
+
+      const result = results[0].result;
+      
+      if (result.found) {
+        console.log(`[WAIT] ✓ Element found after ${elapsedTime}ms:`, {
+          xpath,
+          attempts,
+          elementInfo: result.info
+        });
+        return true;
+      }
+
+      console.log(`[WAIT] Element not found on attempt ${attempts}:`, result.info);
+      console.log(`[WAIT] Waiting ${checkInterval}ms before next check`);
+      
+      // Ждем перед следующей проверкой
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    } catch (error) {
+      console.error(`[WAIT] ✗ Error checking element on attempt ${attempts}:`, error);
+      // Продолжаем попытки даже при ошибке
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    }
+  }
+
+  console.warn(`[WAIT] ✗ Element not found after ${timeout}ms:`, {
+    xpath,
+    totalAttempts: attempts,
+    checkInterval
+  });
+  return false;
+};
+
 setInterval(async () => {
   console.log('Fetching commands...');
   try {
@@ -146,6 +242,21 @@ setInterval(async () => {
             for (const action of command.params.data) {
               console.log('Processing action:', action);
               let actionSuccess = false;
+
+              // Если есть xpath, ждем появления элемента
+              if (action.element_xpath && action.on_start) {
+                console.log(`Waiting up to ${action.on_start}ms for element:`, action.element_xpath);
+                const elementFound = await waitForElement(tabId, action.element_xpath, action.on_start);
+                if (!elementFound) {
+                  console.warn('Element not found within timeout, skipping action');
+                  allActionsSuccessful = false;
+                  break;
+                }
+              } else if (action.on_start) {
+                // Если нет xpath, просто ждем указанное время
+                console.log(`Waiting ${action.on_start}ms`);
+                await new Promise(resolve => setTimeout(resolve, action.on_start));
+              }
               
               switch (action.action) {
                 case 'click':
@@ -171,9 +282,7 @@ setInterval(async () => {
                           ).singleNodeValue;
                           if (element instanceof HTMLInputElement) {
                             element.value = value;
-                            // Добавляем событие input для триггера обработчиков
                             element.dispatchEvent(new Event('input', { bubbles: true }));
-                            // Добавляем событие change
                             element.dispatchEvent(new Event('change', { bubbles: true }));
                             return true;
                           }
