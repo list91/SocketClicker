@@ -57,63 +57,65 @@ const moveCommandToHistory = async (commandId: string) => {
   }
 };
 
-// Функция для выполнения клика через debugger API
-const clickElementWithDebugger = async (tabId: number, xpath: string) => {
+// Функция для клика через chrome.scripting.executeScript
+const clickElementWithScript = async (tabId: number, xpath: string): Promise<boolean> => {
   try {
-    // Подключаемся к отладчику
-    await chrome.debugger.attach({ tabId }, "1.3");
-    
-    // Находим элемент по XPath
-    const { result } = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
-      expression: `
-        (function() {
-          const element = document.evaluate(
-            "${xpath}",
-            document,
-            null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
-            null
-          ).singleNodeValue;
-          if (!element) return null;
-          const rect = element.getBoundingClientRect();
-          return {
-            x: Math.round(rect.left + rect.width / 2),
-            y: Math.round(rect.top + rect.height / 2)
-          };
-        })()
-      `
-    }) as { result: { value: { x: number; y: number } | null } };
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (xpath: string) => {
+        const element = document.evaluate(
+          xpath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        ).singleNodeValue as HTMLElement;
 
-    if (result?.value) {
-      // Эмулируем клик мышью
-      await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
-        type: "mousePressed",
-        x: result.value.x,
-        y: result.value.y,
-        button: "left",
-        clickCount: 1
-      });
-      
-      await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
-        type: "mouseReleased",
-        x: result.value.x,
-        y: result.value.y,
-        button: "left",
-        clickCount: 1
-      });
-      
-      return true;
-    } else {
-      console.warn('Element not found for click');
-      return false;
-    }
+        if (!element) {
+          console.warn('Element not found');
+          return false;
+        }
 
-    // Отключаемся от отладчика
-    await chrome.debugger.detach({ tabId });
-    
+        // Создаем события mousedown, mouseup и click
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          buttons: 1
+        });
+
+        const mousedownEvent = new MouseEvent('mousedown', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          buttons: 1
+        });
+
+        const mouseupEvent = new MouseEvent('mouseup', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          buttons: 1
+        });
+
+        // Последовательно запускаем события
+        element.dispatchEvent(mousedownEvent);
+        element.dispatchEvent(mouseupEvent);
+        element.dispatchEvent(clickEvent);
+
+        // Для кнопок и ссылок также пробуем вызвать click()
+        if (element instanceof HTMLButtonElement || element instanceof HTMLAnchorElement) {
+          element.click();
+        }
+
+        return true;
+      },
+      args: [xpath]
+    });
+
+    return results[0].result;
   } catch (error) {
-    console.error('Error in debugger click:', error);
-    await chrome.debugger.detach({ tabId }).catch(() => {});
+    console.error('Error in script click:', error);
     return false;
   }
 };
@@ -149,7 +151,7 @@ setInterval(async () => {
                 case 'click':
                   if (action.element_xpath) {
                     console.log('Clicking element:', action.element_xpath);
-                    actionSuccess = await clickElementWithDebugger(tabId, action.element_xpath);
+                    actionSuccess = await clickElementWithScript(tabId, action.element_xpath);
                   }
                   break;
                   
@@ -169,6 +171,10 @@ setInterval(async () => {
                           ).singleNodeValue;
                           if (element instanceof HTMLInputElement) {
                             element.value = value;
+                            // Добавляем событие input для триггера обработчиков
+                            element.dispatchEvent(new Event('input', { bubbles: true }));
+                            // Добавляем событие change
+                            element.dispatchEvent(new Event('change', { bubbles: true }));
                             return true;
                           }
                           return false;
