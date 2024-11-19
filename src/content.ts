@@ -15,55 +15,55 @@ interface Command {
   time_created: string;
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: { commands: Command[] }) => {
   if (message.commands) {
-    message.commands.forEach((command: Command) => {
+    message.commands.forEach((command) => {
       console.log('Received command:', command);
       
-      command.params.data.forEach((action: ActionBase) => {
-          console.log('step:', action.action);
-          setTimeout(() => {
-            switch (action.action) {
-              case 'go':
-                if (action.value) {
-                  window.location.href = action.value;
-                }
-                break;
-              
-              case 'input':
-                if (action.element_xpath && action.value) {
-                  const element = document.evaluate(
-                    action.element_xpath,
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                  ).singleNodeValue as HTMLInputElement;
+      command.params.data.forEach((action) => {
+        console.log('step:', action.action);
+        setTimeout(() => {
+          switch (action.action) {
+            case 'go':
+              if (action.value) {
+                window.location.href = action.value;
+              }
+              break;
+            
+            case 'input':
+              if (action.element_xpath && action.value) {
+                const element = document.evaluate(
+                  action.element_xpath,
+                  document,
+                  null,
+                  XPathResult.FIRST_ORDERED_NODE_TYPE,
+                  null
+                ).singleNodeValue;
 
-                  if (element) {
-                    element.value = action.value;
-                  }
+                if (element instanceof HTMLInputElement) {
+                  element.value = action.value;
                 }
-                break;
-              
-              case 'click':
-                if (action.element_xpath) {
-                  const element = document.evaluate(
-                    action.element_xpath,
-                    document,
-                    null,
-                    XPathResult.FIRST_ORDERED_NODE_TYPE,
-                    null
-                  ).singleNodeValue;
+              }
+              break;
+            
+            case 'click':
+              if (action.element_xpath) {
+                const element = document.evaluate(
+                  action.element_xpath,
+                  document,
+                  null,
+                  XPathResult.FIRST_ORDERED_NODE_TYPE,
+                  null
+                ).singleNodeValue;
 
-                  if (element) {
-                    (element as HTMLElement).click();
-                  }
+                if (element instanceof HTMLElement) {
+                  element.click();
                 }
-                break;
-            }
-          }, action.on_start);
-        });
+              }
+              break;
+          }
+        }, action.on_start || 0);
+      });
     });
   }
 });

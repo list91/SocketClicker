@@ -11,8 +11,9 @@
     "rootDir": "./src",
     "sourceMap": true,
     "declaration": true,
-    "lib": ["dom", "es6"],
-    "types": ["chrome"]
+    "lib": ["dom", "es6", "es2015"],
+    "types": ["chrome"],
+    "noImplicitAny": false
   },
   "include": [
     "src/**/*"

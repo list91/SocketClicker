@@ -4,10 +4,11 @@ setInterval(async () => {
     const response = await fetch('http://localhost:5000/select_last?count=4');
     const commands = await response.json();
     
-    if (commands && commands.length) {
+    if (commands && commands.length > 0) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, { commands });
+        const tabId = tabs[0]?.id;
+        if (tabId) {
+          chrome.tabs.sendMessage(tabId, { commands });
         }
       });
     }
