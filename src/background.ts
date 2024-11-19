@@ -34,6 +34,61 @@ const ensureContentScriptLoaded = async (tabId: number): Promise<boolean> => {
   }
 };
 
+// Функция для выполнения клика через debugger API
+const clickElementWithDebugger = async (tabId: number, xpath: string) => {
+  try {
+    // Подключаемся к отладчику
+    await chrome.debugger.attach({ tabId }, "1.3");
+    
+    // Находим элемент по XPath
+    const { result } = await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+      expression: `
+        (function() {
+          const element = document.evaluate(
+            "${xpath}",
+            document,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
+          if (!element) return null;
+          const rect = element.getBoundingClientRect();
+          return {
+            x: Math.round(rect.left + rect.width / 2),
+            y: Math.round(rect.top + rect.height / 2)
+          };
+        })()
+      `
+    }) as { result: { value: { x: number; y: number } | null } };
+
+    if (result?.value) {
+      // Эмулируем клик мышью
+      await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+        type: "mousePressed",
+        x: result.value.x,
+        y: result.value.y,
+        button: "left",
+        clickCount: 1
+      });
+      
+      await chrome.debugger.sendCommand({ tabId }, "Input.dispatchMouseEvent", {
+        type: "mouseReleased",
+        x: result.value.x,
+        y: result.value.y,
+        button: "left",
+        clickCount: 1
+      });
+    }
+
+    // Отключаемся от отладчика
+    await chrome.debugger.detach({ tabId });
+    
+  } catch (error) {
+    console.error('Error in debugger click:', error);
+    await chrome.debugger.detach({ tabId }).catch(() => {});
+  }
+};
+
 setInterval(async () => {
   console.log('Fetching commands...');
   try {
@@ -50,18 +105,52 @@ setInterval(async () => {
         
         const tabId = tabs[0]?.id;
         if (tabId) {
-          console.log('Sending to tab:', tabId);
+          console.log('Processing commands for tab:', tabId);
           
-          // Проверяем и при необходимости загружаем content script
-          const isReady = await ensureContentScriptLoaded(tabId);
-          
-          if (isReady) {
-            console.log('Tab is ready, sending commands');
-            chrome.tabs.sendMessage(tabId, { commands }).catch(error => {
-              console.error('Failed to send commands to tab:', error);
-            });
-          } else {
-            console.log('Tab is not ready for commands');
+          for (const command of commands) {
+            console.log('Processing command:', command);
+            
+            for (const action of command.params.data) {
+              console.log('Processing action:', action);
+              
+              switch (action.action) {
+                case 'click':
+                  if (action.element_xpath) {
+                    console.log('Clicking element:', action.element_xpath);
+                    await clickElementWithDebugger(tabId, action.element_xpath);
+                  }
+                  break;
+                  
+                case 'input':
+                  if (action.element_xpath && action.value) {
+                    console.log('Setting input value:', action.value);
+                    await chrome.scripting.executeScript({
+                      target: { tabId },
+                      func: (xpath: string, value: string) => {
+                        const element = document.evaluate(
+                          xpath,
+                          document,
+                          null,
+                          XPathResult.FIRST_ORDERED_NODE_TYPE,
+                          null
+                        ).singleNodeValue;
+                        if (element instanceof HTMLInputElement) {
+                          element.value = value;
+                        }
+                      },
+                      args: [action.element_xpath, action.value]
+                    });
+                  }
+                  break;
+                  
+                case 'go':
+                  if (action.value) {
+                    console.log('Navigating to:', action.value);
+                    await chrome.tabs.update(tabId, { url: action.value });
+                  }
+                  break;
+              }
+            }
           }
         } else {
           console.log('No active tab found');
