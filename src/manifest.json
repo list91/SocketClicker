@@ -1,22 +1,31 @@
 {
   "manifest_version": 3,
-  "name": "Link Counter",
-  "version": "1.0",
-  "description": "Counts links on the current tab",
+  "name": "SocketClicker",
+  "version": "1.0.0",
+  "description": "Browser automation extension",
   "permissions": [
+    "tabs",
     "activeTab",
-    "scripting"
+    "scripting",
+    "webNavigation",
+    "storage"
   ],
-  "action": {
-    "default_popup": "popup.html"
-  },
+  "host_permissions": [
+    "http://localhost:5000/*",
+    "https://*/*",
+    "http://*/*"
+  ],
   "background": {
     "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_start"
     }
   ]
 }

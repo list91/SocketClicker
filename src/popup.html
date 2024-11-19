@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SocketClicker</title>
+  <style>
+    body {
+      width: 200px;
+      padding: 10px;
+      font-family: Arial, sans-serif;
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 5px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .active {
+      background-color: #e6ffe6;
+      color: #006600;
+    }
+    .paused {
+      background-color: #ffe6e6;
+      color: #660000;
+    }
+  </style>
+</head>
+<body>
+  <div class="toggle-container">
+    <label>
+      <input type="checkbox" id="enableScripts" checked>
+      Enable Script Execution
+    </label>
+  </div>
+  <div id="status" class="status active">Scripts Active</div>
+  <script src="popup.js"></script>
+</body>
+</html>

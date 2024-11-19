@@ -4,11 +4,11 @@ import CopyWebpackPlugin from 'copy-webpack-plugin'
 
 const config: webpack.Configuration = {
     entry: {
-        background: './src/background/background.ts',
-        popup: './src/ui/popup.ts',
+        content: './src/content.ts',
+        background: './src/background.ts'
     },
     resolve: {
-        extensions: [".ts"],
+        extensions: [".ts", ".js"],
     },
     module: {
         rules: [
@@ -22,13 +22,15 @@ const config: webpack.Configuration = {
     output: {
         filename: '[name].js',
         path: path.resolve(__dirname, 'dist'),
-        clean: true, // Clean the output directory before emit.
+        clean: true,
     },
     plugins: [
         new CopyWebpackPlugin({
-            patterns: [{ from: 'static' }],
+            patterns: [
+                { from: 'src/manifest.json' }
+            ],
         }),
     ]
-}
+};
 
-export default config
+export default config;
