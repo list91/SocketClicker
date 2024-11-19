@@ -1,4 +1,6 @@
 import { XPATH_SELECTORS } from '../constants/xpathSelectors';
+import { TIMEOUTS } from '../constants/timeouts';
+import { waitForElement, waitForElementToBeInteractive, WaitConfig } from '../utils/waitForElement';
 
 /**
  * Типы команд
@@ -118,33 +120,28 @@ export class CommandExecutor {
      * @returns результат выполнения команды
      */
     private static async handleClick(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
-        if (args.length < 1) {
-            return {
-                success: false,
-                message: 'Не указан селектор для клика'
-            };
-        }
-
         try {
-            const selector = args[0];
-            const element = document.querySelector(selector);
-            
-            if (!element) {
+            const xpath = args[0];
+            if (!xpath) {
                 return {
                     success: false,
-                    message: `Элемент не найден: ${selector}`
+                    message: 'XPath не указан'
                 };
             }
 
+            const element = await waitForElement(xpath, TIMEOUTS.CLICK);
+            await waitForElementToBeInteractive(element, TIMEOUTS.CLICK);
+            
             (element as HTMLElement).click();
+            
             return {
                 success: true,
-                message: `Клик по элементу: ${selector}`
+                message: 'Клик выполнен успешно'
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 success: false,
-                message: `Ошибка при клике: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+                message: `Ошибка при выполнении клика: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
             };
         }
     }
@@ -156,37 +153,30 @@ export class CommandExecutor {
      * @returns результат выполнения команды
      */
     private static async handleInput(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
-        if (args.length < 2) {
-            return {
-                success: false,
-                message: 'Не указан селектор или текст для ввода'
-            };
-        }
-
         try {
-            const selector = args[0];
-            const text = params?.content || args.slice(1).join(' ');
-            const element = document.querySelector(selector) as HTMLInputElement;
-            
-            if (!element) {
+            const [xpath, text] = args;
+            if (!xpath || !text) {
                 return {
                     success: false,
-                    message: `Элемент не найден: ${selector}`
+                    message: 'XPath или текст не указаны'
                 };
             }
 
-            element.value = text;
+            const element = await waitForElement(xpath, TIMEOUTS.INPUT);
+            await waitForElementToBeInteractive(element, TIMEOUTS.INPUT);
+            
+            (element as HTMLInputElement).value = text;
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
 
             return {
                 success: true,
-                message: `Введен текст в элемент: ${selector}`
+                message: 'Текст введен успешно'
             };
-        } catch (error) {
+        } catch (error: unknown) {
             return {
                 success: false,
-                message: `Ошибка при вводе: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+                message: `Ошибка при вводе текста: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
             };
         }
     }
@@ -286,115 +276,166 @@ export class CommandExecutor {
      * @returns результат выполнения команды
      */
     private static async handlePublication(args: string[], params?: CommandParams): Promise<CommandExecutionResult> {
-        const text = params?.content;
-        if (!text) {
-            return {
-                success: false,
-                message: 'Не указан текст для публикации'
-            };
-        }
-
         try {
-            // Get active tab
+            console.log('[Publication] Starting publication process...');
+            const text = params?.content;
+            if (!text) {
+                console.error('[Publication] No text provided for publication');
+                return {
+                    success: false,
+                    message: 'Не указан текст для публикации'
+                };
+            }
+
+            console.log('[Publication] Getting active tab...');
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             const tab = tabs[0];
             if (!tab?.id) {
+                console.error('[Publication] No active tab found');
                 return {
                     success: false,
                     message: 'Не найдена активная вкладка'
                 };
             }
 
-            // Navigate to the start page
+            console.log('[Publication] Navigating to publication page...');
             await chrome.tabs.update(tab.id, { url: XPATH_SELECTORS.PUBLICATION.START_PAGE });
+            
+            console.log('[Publication] Waiting for page load (12000ms)...');
+            await new Promise(resolve => setTimeout(resolve, 12000));
 
-            // Wait for page load
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Execute content script for publication
-            const results = await chrome.scripting.executeScript({
+            console.log('[Publication] Starting content script execution...');
+            const result = await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
-                func: (text: string, selectors: typeof XPATH_SELECTORS.PUBLICATION) => {
+                func: async (text: string, selectors: typeof XPATH_SELECTORS.PUBLICATION, timeouts: typeof TIMEOUTS.PUBLICATION): Promise<CommandExecutionResult> => {
                     try {
-                        // Click publish button
-                        const publishButton = document.evaluate(
-                            selectors.PUBLISH_BUTTON,
-                            document,
-                            null,
-                            XPathResult.FIRST_ORDERED_NODE_TYPE,
-                            null
-                        ).singleNodeValue as HTMLElement;
+                        const logStep = (step: string, startTime: number) => {
+                            const elapsed = Date.now() - startTime;
+                            console.log(`[Publication] ${step} (${elapsed}ms)`);
+                        };
 
-                        if (!publishButton) {
-                            return { success: false, message: 'Кнопка публикации не найдена' } as CommandExecutionResult;
-                        }
-                        publishButton.click();
+                        // Функция ожидания элемента с логированием
+                        const waitForElement = async (xpath: string, config?: WaitConfig): Promise<Element> => {
+                            const startTime = Date.now();
+                            const timeout = config?.timeout || 10000;
+                            const interval = config?.interval || 500;
+                            console.log(`[Publication] Waiting for element: ${xpath} (timeout: ${timeout}ms, interval: ${interval}ms)`);
 
-                        // Wait for form
-                        return new Promise<CommandExecutionResult>(resolve => {
-                            setTimeout(async () => {
-                                try {
-                                    // Input text
-                                    const textInput = document.evaluate(
-                                        selectors.TEXT_INPUT,
-                                        document,
-                                        null,
-                                        XPathResult.FIRST_ORDERED_NODE_TYPE,
-                                        null
-                                    ).singleNodeValue as HTMLElement;
+                            while (Date.now() - startTime < timeout) {
+                                const element = document.evaluate(
+                                    xpath,
+                                    document,
+                                    null,
+                                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                                    null
+                                ).singleNodeValue;
 
-                                    if (!textInput) {
-                                        resolve({ success: false, message: 'Поле ввода текста не найдено' });
-                                        return;
-                                    }
-                                    textInput.textContent = text;
-
-                                    // Click submit button
-                                    const submitButton = document.evaluate(
-                                        selectors.SUBMIT_BUTTON,
-                                        document,
-                                        null,
-                                        XPathResult.FIRST_ORDERED_NODE_TYPE,
-                                        null
-                                    ).singleNodeValue as HTMLElement;
-
-                                    if (!submitButton) {
-                                        resolve({ success: false, message: 'Кнопка отправки не найдена' });
-                                        return;
-                                    }
-                                    submitButton.click();
-
-                                    resolve({ success: true, message: 'Публикация успешно выполнена' });
-                                } catch (error) {
-                                    resolve({
-                                        success: false,
-                                        message: `Ошибка при выполнении действий: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
-                                    });
+                                if (element) {
+                                    logStep(`Element found: ${xpath}`, startTime);
+                                    return element as Element;
                                 }
-                            }, 1000);
-                        });
-                    } catch (error) {
+
+                                await new Promise(resolve => setTimeout(resolve, interval));
+                                console.log(`[Publication] Still waiting for element: ${xpath} (${Date.now() - startTime}ms elapsed)`);
+                            }
+
+                            throw new Error(`Элемент не найден: ${xpath}`);
+                        };
+
+                        // Функция проверки интерактивности с логированием
+                        const waitForElementToBeInteractive = async (element: Element, config?: WaitConfig): Promise<boolean> => {
+                            const startTime = Date.now();
+                            const timeout = config?.timeout || 10000;
+                            const interval = config?.interval || 500;
+                            console.log('[Publication] Checking element interactivity...');
+
+                            while (Date.now() - startTime < timeout) {
+                                const rect = element.getBoundingClientRect();
+                                const isVisible = !!(rect.top || rect.bottom || rect.width || rect.height);
+                                
+                                if (isVisible && 
+                                    !element.hasAttribute('disabled') && 
+                                    window.getComputedStyle(element).display !== 'none' &&
+                                    window.getComputedStyle(element).visibility !== 'hidden') {
+                                    logStep('Element is interactive', startTime);
+                                    return true;
+                                }
+
+                                await new Promise(resolve => setTimeout(resolve, interval));
+                                console.log(`[Publication] Waiting for element to be interactive (${Date.now() - startTime}ms elapsed)`);
+                            }
+
+                            throw new Error('Элемент не доступен для взаимодействия');
+                        };
+
+                        console.log('[Publication] Looking for publish button...');
+                        const publishButton = await waitForElement(
+                            selectors.PUBLISH_BUTTON,
+                            timeouts.PUBLISH_BUTTON
+                        );
+                        await waitForElementToBeInteractive(publishButton, timeouts.PUBLISH_BUTTON);
+                        console.log('[Publication] Clicking publish button...');
+                        (publishButton as HTMLElement).click();
+
+                        console.log('[Publication] Looking for input form...');
+                        const inputForm = await waitForElement(
+                            selectors.TEXT_INPUT,
+                            timeouts.TEXT_INPUT
+                        );
+                        await waitForElementToBeInteractive(inputForm, timeouts.TEXT_INPUT);
+                        
+                        console.log('[Publication] Setting text input value...');
+                        (inputForm as HTMLInputElement).value = text;
+                        inputForm.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputForm.dispatchEvent(new Event('change', { bubbles: true }));
+
+                        console.log('[Publication] Looking for submit button...');
+                        const submitButton = await waitForElement(
+                            selectors.SUBMIT_BUTTON,
+                            timeouts.SUBMIT_BUTTON
+                        );
+                        await waitForElementToBeInteractive(submitButton, timeouts.SUBMIT_BUTTON);
+                        console.log('[Publication] Clicking submit button...');
+                        (submitButton as HTMLElement).click();
+
+                        console.log('[Publication] Waiting for confirmation...');
+                        await waitForElement(
+                            selectors.SUBMIT_BUTTON,
+                            timeouts.SUBMIT_BUTTON
+                        );
+
+                        console.log('[Publication] Publication completed successfully');
+                        return {
+                            success: true,
+                            message: 'Публикация успешно создана'
+                        };
+                    } catch (error: unknown) {
+                        const errorMessage = `Ошибка при создании публикации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`;
+                        console.error(`[Publication] ${errorMessage}`);
                         return {
                             success: false,
-                            message: `Ошибка при выполнении действий: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
-                        } as CommandExecutionResult;
+                            message: errorMessage
+                        };
                     }
                 },
-                args: [text, XPATH_SELECTORS.PUBLICATION]
+                args: [text, XPATH_SELECTORS.PUBLICATION, TIMEOUTS.PUBLICATION]
             });
 
-            if (!results || results.length === 0 || !results[0].result) {
+            if (!result[0].result) {
+                console.error('[Publication] Script execution failed');
                 return {
                     success: false,
                     message: 'Не удалось выполнить скрипт публикации'
                 };
             }
 
-            return results[0].result;
-        } catch (error) {
+            return result[0].result;
+        } catch (error: unknown) {
+            const errorMessage = `Ошибка при создании публикации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`;
+            console.error(`[Publication] ${errorMessage}`);
             return {
                 success: false,
-                message: `Ошибка при публикации: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`
+                message: errorMessage
             };
         }
     }

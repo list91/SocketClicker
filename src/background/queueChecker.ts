@@ -13,6 +13,9 @@ interface Command {
     time_created: string;
 }
 
+// Множество для хранения ID команд в процессе выполнения
+const processingCommands = new Set<string>();
+
 export async function checkQueueStatus() {
     try {
         // Check if extension is enabled
@@ -34,6 +37,14 @@ export async function checkQueueStatus() {
 
         if (commands.length > 0) {
             const command = commands[0];
+
+            // Проверяем, не выполняется ли уже эта команда
+            if (processingCommands.has(command.id)) {
+                console.log(`Command ${command.id} is already being processed, skipping...`);
+                await updateBadge();
+                return;
+            }
+
             console.log('Received command:', command);
 
             // Проверяем состояние расширения перед выполнением команды
@@ -44,14 +55,17 @@ export async function checkQueueStatus() {
                 return;
             }
 
-            // Обработка команды с использованием CommandExecutor
-            const result = await CommandExecutor.executeCommand(command.command, command.params);
-            
-            // Логирование результата выполнения команды
-            console.log(`Команда "${command.command}":`, result);
-
-            // Отправляем команду в историю на том же сервере
             try {
+                // Добавляем команду в множество обрабатываемых
+                processingCommands.add(command.id);
+
+                // Обработка команды с использованием CommandExecutor
+                const result = await CommandExecutor.executeCommand(command.command, command.params);
+                
+                // Логирование результата выполнения команды
+                console.log(`Команда "${command.command}":`, result);
+
+                // Отправляем команду в историю на том же сервере
                 const moveResponse = await fetch(`${SERVER_BASE_URL}/move_to_history`, {
                     method: 'POST',
                     headers: {
@@ -69,13 +83,12 @@ export async function checkQueueStatus() {
                 if (!moveResponse.ok) {
                     const errorText = await moveResponse.text();
                     console.error(`Failed to move command to history. Status: ${moveResponse.status}, Error: ${errorText}`);
-                    await updateBadge();
-                    return;
                 }
             } catch (error) {
-                console.error('Error moving command to history:', error);
-                await updateBadge();
-                return;
+                console.error('Error processing command:', error);
+            } finally {
+                // Удаляем команду из множества обрабатываемых, независимо от результата
+                processingCommands.delete(command.id);
             }
         } else {
             console.log('No commands in queue');
