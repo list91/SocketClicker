@@ -1,88 +1,89 @@
-# SocketClicker Chrome Extension
+# SocketClicker 🚀
 
-## Описание проекта
-SocketClicker - это расширение для Chrome, предназначенное для удаленного выполнения команд через локальный сервер. Расширение поддерживает различные типы команд, включая публикацию контента, навигацию и взаимодействие с элементами веб-страниц.
+## Overview
+SocketClicker is a powerful Chrome extension designed for remote command execution and automated web interactions. It provides a reliable and efficient way to manage and execute commands through a local server interface.
 
-## Особенности
-- Периодическая проверка очереди команд
-- Получение и выполнение команд с локального сервера
-- Логирование и обработка команд
-- Поддержка различных типов команд
-- Управление состоянием расширения (включение/выключение)
-- Эмуляция пользовательских действий
+## Features
+- 🔄 Remote command execution system
+- 📊 Reliable publication workflow
+- 🔄 Command queue management
+- 🛡️ Duplicate command prevention
+- 📝 Comprehensive logging system
+- ⚡ Fast and efficient DOM interactions
+- 🕒 Smart element waiting mechanism
 
-## Структура проекта
-```
-src/
-├── background/        # Фоновые процессы
-│   ├── background.ts  # Основной фоновый скрипт
-│   └── queueChecker.ts# Проверка очереди команд
-├── content/           # Скрипты контента
-│   └── content.ts     # Взаимодействие со страницей
-├── core/             # Основная логика
-│   ├── commandExecutor.ts # Исполнитель команд
-│   └── common.ts     # Общие утилиты
-├── ui/               # Пользовательский интерфейс
-│   ├── popup.html    # HTML попапа
-│   └── popup.ts      # Логика попапа
-└── manifest.json     # Конфигурация расширения
+## Installation
+1. Clone the repository
+```bash
+git clone https://github.com/list91/SocketClicker.git
+cd SocketClicker
 ```
 
-## Технологии
-- TypeScript
-- Chrome Extension API
-- Webpack
-- Manifest V3
+2. Install dependencies
+```bash
+npm install
+```
 
-## Установка
-1. Клонируйте репозиторий
-2. Установите зависимости:
-   ```bash
-   npm install
-   ```
+3. Build the extension
+```bash
+npm run build
+```
 
-## Сборка расширения
-- Разработка (с автоматической пересборкой):
-  ```bash
-  npm run start
-  ```
-- Продакшн:
-  ```bash
-  npm run build
-  ```
+4. Load the extension in Chrome
+- Open Chrome and navigate to `chrome://extensions/`
+- Enable "Developer mode"
+- Click "Load unpacked"
+- Select the `dist` directory from the project
 
-## Конфигурация
-- URL сервера настраивается в `src/background/queueChecker.ts`
-- Эндпоинты:
-  - `/read_first?count=1`: Получение команд
-  - `/move_to_history`: Перемещение команд в историю
+## Usage
+1. Start the local server (required for command processing)
+2. The extension will automatically connect to the local server
+3. Commands can be sent through the server API
+4. Monitor command execution through the extension's detailed logging
 
-## Поддерживаемые команды
-- `ping`: Проверка связи
-- `echo {message}`: Вывод сообщения в консоль
-- `click {selector}`: Клик по элементу
-- `input {selector} {text}`: Ввод текста
-- `scroll {direction} {amount}`: Прокрутка страницы
-- `wait {ms}`: Ожидание
-- `publication {text}`: Публикация контента
+## API Documentation
+### Command Structure
+```typescript
+interface Command {
+    id: string;
+    command: string;
+    params?: {
+        content?: string;
+        [key: string]: any;
+    };
+    time_created: string;
+}
+```
 
-## Разработка
-1. Весь код разделен по функциональным директориям
-2. Используйте соответствующие директории для нового кода:
-   - `background/`: для фоновых процессов
-   - `content/`: для скриптов, работающих со страницей
-   - `core/`: для основной бизнес-логики
-   - `ui/`: для компонентов интерфейса
-3. Для добавления новых команд:
-   - Добавьте тип команды в `CommandType`
-   - Создайте обработчик в `CommandExecutor`
-   - При необходимости добавьте селекторы в `xpathSelectors.ts`
+### Available Commands
+- `publication`: Execute publication workflow
+- More commands can be added through the command executor
 
-## Лицензия
-MIT License
+## Development
+- Built with TypeScript and Webpack
+- Uses Chrome Extension Manifest V3
+- Implements modern async/await patterns
+- Comprehensive error handling
 
-## Контрибуция
-1. Форкните репозиторий
-2. Создайте feature-ветку
-3. Внесите изменения
-4. Создайте Pull Request
+## Version History
+- v1.0.0 - First stable release
+  - Complete publication workflow
+  - Command queue management
+  - Duplicate command prevention
+  - Comprehensive logging
+
+## Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+For support, please open an issue in the GitHub repository.
+
+---
+Made with ❤️ by list91
