@@ -1,4 +1,3 @@
-// Simplified background script to fetch commands every 3 seconds
 console.log('Background script started');
 
 // Функция для проверки и загрузки content script
@@ -112,6 +111,12 @@ const clickElementWithScript = async (tabId: number, xpath: string): Promise<boo
       },
       args: [xpath]
     });
+
+    // Добавляем проверку на существование результата
+    if (!results || !results[0] || typeof results[0].result !== 'boolean') {
+      console.warn('Invalid click result');
+      return false;
+    }
 
     return results[0].result;
   } catch (error) {
@@ -257,8 +262,7 @@ setInterval(async () => {
                 console.log(`Waiting ${action.on_start}ms`);
                 await new Promise(resolve => setTimeout(resolve, action.on_start));
               }
-              
-              switch (action.action) {
+　　 　 　 　 switch (action.action) {
                 case 'click':
                   if (action.element_xpath) {
                     console.log('Clicking element:', action.element_xpath);
@@ -311,8 +315,7 @@ setInterval(async () => {
                   }
                   break;
               }
-              
-              if (!actionSuccess) {
+　　 　 　 　 if (!actionSuccess) {
                 allActionsSuccessful = false;
                 break; // Прерываем выполнение команды при первой неудаче
               }
