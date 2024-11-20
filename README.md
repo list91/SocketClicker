@@ -1,6 +1,14 @@
 # SocketClicker Browser Extension
 
-Chrome extension for automated web interactions through remote commands.
+Chrome extension for automated web interactions through remote commands. Works in conjunction with proxy-pilot server to execute automated browser actions.
+
+## Integration with proxy-pilot
+
+SocketClicker is designed to work seamlessly with the proxy-pilot server:
+- proxy-pilot sends commands to control browser actions
+- SocketClicker executes these commands and provides feedback
+- Communication happens via local HTTP endpoints (default port: 5000)
+- Supports command queuing and sequential execution
 
 ## Features
 
@@ -9,13 +17,15 @@ Chrome extension for automated web interactions through remote commands.
   - Navigation ('go')
   - Input ('input')
   - Click ('click')
-- Automatic command history tracking
-- Robust error handling and logging
+- Robust element detection and interaction
+- Advanced error handling and logging
+- Command history tracking
 
 ## Requirements
 
 - Chrome browser
 - Local proxy-pilot server running on port 5000
+- Node.js and npm for development
 
 ## Installation
 
@@ -36,51 +46,53 @@ npm run build
 
 ## Testing
 
-To add a test command via PowerShell:
+Example command via PowerShell:
 
 ```powershell
 Invoke-WebRequest -Uri http://localhost:5000/add_command -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"command": "execute_sequence", "params": {"data": [{"on_start": 0, "action": "go", "value": "https://www.youtube.com/"}, {"on_start": 8000, "action": "input", "element_xpath": "//*[@id=''search'']", "value": "test search"}, {"on_start": 1000, "action": "click", "element_xpath": "//*[@id=''search-icon-legacy'']"}]}}'
 ```
 
-This command will:
-1. Navigate to YouTube
-2. Wait 8 seconds
-3. Enter "test search" in the search box
-4. Wait 1 second
-5. Click the search button
-
 ## Architecture
 
-The extension consists of several key components:
+The extension consists of three main components:
 
 1. Background Script (background.ts):
-   - Polls for new commands every 3 seconds
-   - Executes commands using appropriate APIs
-   - Manages command history
+   - Manages command polling and execution
+   - Implements robust element detection
+   - Handles command history
+   - Provides comprehensive error handling
 
 2. Content Script (content.ts):
-   - Handles page-specific interactions
+   - Executes page-specific interactions
    - Communicates with background script
+   - Handles DOM manipulation
 
-3. Popup (popup.ts):
-   - Provides extension UI
-   - Shows extension status
+3. Popup Interface:
+   - Displays extension status
+   - Provides minimal user interface
+
+## Key Features
+
+### Element Detection
+- Advanced element visibility checks
+- Robust XPath-based element location
+- Automatic retry mechanism for dynamic content
+
+### Command Execution
+- Sequential command execution
+- Configurable delays between actions
+- Comprehensive error handling
+- Detailed logging for debugging
 
 ## Permissions
 
-The extension requires the following permissions:
+Required permissions:
 - tabs
 - activeTab
 - scripting
 - webNavigation
 - storage
 - debugger
-
-## Error Handling
-
-- All commands are executed with proper error handling
-- Failed commands are logged with detailed error messages
-- Commands are moved to history after execution (success or failure)
 
 ## Development
 
@@ -92,4 +104,14 @@ npm run dev
 ```
 
 2. Make changes to the source files in `src/`
-3. The extension will be automatically rebuilt on changes
+3. The extension will automatically rebuild on changes
+
+## Project Structure
+
+```
+src/
+├── background.ts   # Main extension logic
+├── content.ts      # Page interaction logic
+├── popup.ts        # UI logic
+├── manifest.json   # Extension configuration
+└── popup.html      # UI layout
