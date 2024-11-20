@@ -4,11 +4,13 @@ Chrome extension for automated web interactions through remote commands. Works i
 
 ## Integration with proxy-pilot
 
-SocketClicker is designed to work seamlessly with the proxy-pilot server:
+SocketClicker is designed to work seamlessly with the [proxy-pilot](https://github.com/list91/proxy-pilot) server:
 - proxy-pilot sends commands to control browser actions
 - SocketClicker executes these commands and provides feedback
 - Communication happens via local HTTP endpoints (default port: 5000)
 - Supports command queuing and sequential execution
+
+For server setup and configuration, please refer to the [proxy-pilot repository](https://github.com/list91/proxy-pilot).
 
 ## Features
 
