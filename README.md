@@ -46,6 +46,40 @@ npm run build
    - Click "Load unpacked"
    - Select the `dist` folder
 
+## Build Options
+
+### Regular Build (Recommended)
+```bash
+npm run build
+```
+Creates separate files in the `dist` directory. This is the recommended way to build the extension.
+
+### Experimental Single-File Builds
+
+> ⚠️ **Warning**: The following build methods are experimental and may be unstable. Use them for testing purposes only.
+
+We provide two experimental methods for building the extension into a single JavaScript file:
+
+1. **Webpack Single Bundle** (`npm run build:single`)
+   - Uses webpack for bundling
+   - Better handling of dependencies
+   - Output in `dist-single` directory
+
+2. **TypeScript Compiler Bundle** (`npm run build:tsc`)
+   - Uses TypeScript compiler's AMD module bundling
+   - Simpler bundling process
+   - Output in `dist-tsc` directory
+
+Key differences:
+- Webpack version provides better optimization and smaller file size
+- TypeScript version produces more readable code
+- Both methods are experimental and may have limitations with certain module types or dependencies
+
+To use either experimental build:
+1. Run the corresponding build command
+2. Load the extension from either `dist-single` or `dist-tsc` directory
+3. Report any issues you encounter
+
 ## Testing
 
 Example command via PowerShell:
