@@ -64,6 +64,7 @@ We provide two experimental methods for building the extension into a single Jav
    - Uses webpack for bundling
    - Better handling of dependencies
    - Output in `dist-single` directory
+   - Uses specialized manifest.single.json with correct bundle paths
 
 2. **TypeScript Compiler Bundle** (`npm run build:tsc`)
    - Uses TypeScript compiler's AMD module bundling
@@ -73,12 +74,13 @@ We provide two experimental methods for building the extension into a single Jav
 Key differences:
 - Webpack version provides better optimization and smaller file size
 - TypeScript version produces more readable code
-- Both methods are experimental and may have limitations with certain module types or dependencies
+- Both methods use a specialized manifest.single.json that correctly references bundle.js
+- Both methods produce identical extension structure with all code in bundle.js
 
-To use either experimental build:
-1. Run the corresponding build command
-2. Load the extension from either `dist-single` or `dist-tsc` directory
-3. Report any issues you encounter
+Both experimental builds will create:
+- bundle.js (contains all extension code)
+- manifest.json (configured for single bundle)
+- popup.html (configured to use bundle.js)
 
 ## Testing
 
