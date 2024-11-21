@@ -113,7 +113,7 @@ const clickElementWithScript = async (tabId: number, xpath: string): Promise<boo
       args: [xpath]
     });
 
-    return results[0].result;
+    return results[0].result ?? false;
   } catch (error) {
     console.error('Error in script click:', error);
     return false;
