@@ -7,7 +7,9 @@
   "license": "MIT",
   "scripts": {
     "start": "webpack --watch --config webpack.dev.ts",
-    "build": "webpack --config webpack.prod.ts"
+    "build": "webpack --config webpack.prod.ts",
+    "build:single": "webpack --config webpack.single.ts",
+    "build:tsc": "tsc --project tsconfig.single.json && node scripts/build-single.js"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.6",
