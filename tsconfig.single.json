@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "amd",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outFile": "./dist-tsc/bundle.js",
+    "removeComments": true,
+    "sourceMap": false,
+    "declaration": false,
+    "lib": ["dom", "es6", "es2015"],
+    "types": ["chrome"],
+    "noImplicitAny": false
+  },
+  "files": [
+    "./src/background.ts",
+    "./src/content.ts",
+    "./src/popup.ts"
+  ]
+}
