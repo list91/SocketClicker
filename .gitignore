@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 /dist/
+/dist-single/
+/dist-tsc/
 /build/
 /out/
 
