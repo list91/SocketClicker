@@ -1,3 +1,7 @@
+// Import other scripts for single bundle build
+import './content';
+import './popup';
+
 // Simplified background script to fetch commands every 3 seconds
 console.log('Background script started');
 
