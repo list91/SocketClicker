@@ -6,6 +6,7 @@ const config: webpack.Configuration = {
     entry: {
         background: './src/background.ts',
         popup: './src/popup.ts',
+        content: './src/content.ts'
     },
     resolve: {
         extensions: [".ts"],
@@ -29,6 +30,6 @@ const config: webpack.Configuration = {
             patterns: [{ from: 'static' }],
         }),
     ]
-}
+};
 
-export default config
+export default config;
