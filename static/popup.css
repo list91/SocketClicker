@@ -55,3 +55,30 @@ input:checked + .slider:before {
 .secret {
     margin: 5px;
 }
+
+.container {
+    padding: 15px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.screenshot-btn {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.screenshot-btn:hover {
+    background-color: #45a049;
+}

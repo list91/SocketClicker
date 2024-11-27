@@ -1,57 +1,70 @@
-import {setBadgeText} from "./common"
-
-console.log("Hello, world from popup!")
+import { browser } from 'webextension-polyfill-ts';
+import { setBadgeText } from "./common";
 
 document.addEventListener('DOMContentLoaded', () => {
-    const countLinksButton = document.createElement('button');
-    countLinksButton.textContent = 'Count Links';
-    countLinksButton.addEventListener('click', () => {
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            if (tabs[0].id) {
-                chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: () => {
-                        const links = document.getElementsByTagName('a');
-                        const count = links.length;
-                        
-                        if (count === 0) {
-                            alert('No links found on this page');
-                        } else {
-                            alert(`Found ${count} link${count === 1 ? '' : 's'} on this page`);
-                        }
-                    }
-                });
-            }
-        });
-    });
-    document.body.appendChild(countLinksButton);
+    const screenshotBtn = document.getElementById('screenshot') as HTMLButtonElement;
+    const enabledCheckbox = document.getElementById('enabled') as HTMLInputElement;
+    const itemInput = document.getElementById('item') as HTMLInputElement;
 
-    const clickButton = document.createElement('button');
-    clickButton.textContent = 'Click Link';
-    clickButton.addEventListener('click', () => {
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            if (tabs[0].id) {
-                chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: () => {
-                        const xpath = '//*[@id="js-news-list"]/div[1]/div/div[2]/div[2]/a';
-                        const element = document.evaluate(
-                            xpath,
-                            document,
-                            null,
-                            XPathResult.FIRST_ORDERED_NODE_TYPE,
-                            null
-                        ).singleNodeValue as HTMLElement;
-
-                        if (element) {
-                            element.click();
-                        } else {
-                            alert('Link not found on this page');
-                        }
-                    }
-                });
-            }
-        });
+    // Загружаем сохраненные настройки
+    browser.storage.local.get(['enabled', 'item']).then((result) => {
+        enabledCheckbox.checked = result.enabled || false;
+        itemInput.value = result.item || '';
+        // Устанавливаем начальное состояние бейджа
+        setBadgeText(result.enabled ? 'ON' : 'OFF');
     });
-    document.body.appendChild(clickButton);
+
+    // Сохраняем настройки при изменении
+    enabledCheckbox.addEventListener('change', () => {
+        const isEnabled = enabledCheckbox.checked;
+        browser.storage.local.set({ enabled: isEnabled });
+        setBadgeText(isEnabled ? 'ON' : 'OFF');
+    });
+
+    itemInput.addEventListener('change', () => {
+        browser.storage.local.set({ item: itemInput.value });
+    });
+
+    // Обработчик для кнопки скриншота
+    screenshotBtn.addEventListener('click', async () => {
+        try {
+            // Получаем активную вкладку
+            const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+            
+            if (!tab.id) {
+                throw new Error('No active tab found');
+            }
+
+            // Делаем скриншот активной вкладки
+            const screenshot = await browser.tabs.captureVisibleTab(undefined, { format: 'png' });
+            
+            // Отправляем сообщение в background script для сохранения скриншота
+            await browser.runtime.sendMessage({
+                type: 'SAVE_SCREENSHOT',
+                data: {
+                    dataUrl: screenshot,
+                    tabId: tab.id
+                }
+            });
+
+            // Показываем уведомление об успехе
+            await browser.notifications.create({
+                type: 'basic',
+                iconUrl: '/icons/icon48.png',
+                title: 'Screenshot taken',
+                message: 'Screenshot has been saved to downloads/socketClickerOut'
+            });
+
+        } catch (error) {
+            console.error('Failed to take screenshot:', error);
+            
+            // Показываем уведомление об ошибке
+            await browser.notifications.create({
+                type: 'basic',
+                iconUrl: '/icons/icon48.png',
+                title: 'Screenshot Error',
+                message: 'Failed to take screenshot'
+            });
+        }
+    });
 });

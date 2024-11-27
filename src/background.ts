@@ -1,33 +1,34 @@
-import { checkQueueStatus } from './queueChecker';
+import { browser } from 'webextension-polyfill-ts';
 
-// Запускаем первую проверку сразу
-checkQueueStatus();
-
-// Устанавливаем интервал проверки каждые 3 секунды
-setInterval(checkQueueStatus, 2000);
-
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'countLinks') {
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            if (tabs[0].id) {
-                chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: countLinks
-                });
-            }
-        });
-    }
+// Создаем папку для сохранения скриншотов если она не существует
+browser.runtime.onInstalled.addListener(() => {
+    // Папка будет создана автоматически при первом сохранении
+    console.log('Extension installed');
 });
 
-// Function to count links
-function countLinks() {
-    const links = document.getElementsByTagName('a');
-    const count = links.length;
-    
-    if (count === 0) {
-        alert('No links found on this page');
-    } else {
-        alert(`Found ${count} link${count === 1 ? '' : 's'} on this page`);
+// Обработчик сообщений
+browser.runtime.onMessage.addListener(async (message: { type: string; data: { dataUrl: string; tabId: number } }) => {
+    if (message.type === 'SAVE_SCREENSHOT') {
+        try {
+            // Получаем текущую дату и время для имени файла
+            const date = new Date();
+            const fileName = `screenshot_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}${date.getSeconds().toString().padStart(2, '0')}.png`;
+
+            // Конвертируем base64 в blob
+            const response = await fetch(message.data.dataUrl);
+            const blob = await response.blob();
+
+            // Сохраняем файл
+            await browser.downloads.download({
+                url: URL.createObjectURL(blob),
+                filename: `socketClickerOut/${fileName}`,
+                saveAs: false
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to save screenshot:', error instanceof Error ? error.message : 'Unknown error');
+            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
     }
-}
+});
