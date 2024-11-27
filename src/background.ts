@@ -17,61 +17,81 @@ async function pressQ(tabId: number) {
                     const activeElement = document.activeElement;
                     console.log('Active element:', activeElement);
 
-                    // Если активный элемент - это input или textarea
-                    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-                        console.log('Input/textarea is focused, inserting Q');
+                    // Функция для отправки события
+                    function sendKeyEvent(element, eventType, key) {
+                        const evt = new KeyboardEvent(eventType, {
+                            key: key,
+                            code: 'KeyQ',
+                            keyCode: 81,
+                            which: 81,
+                            bubbles: true,
+                            cancelable: true,
+                            composed: true,
+                            view: window
+                        });
                         
-                        // Получаем текущую позицию курсора
-                        const start = activeElement.selectionStart;
-                        const end = activeElement.selectionEnd;
-                        
-                        // Вставляем 'q' в текущую позицию
-                        const value = activeElement.value;
-                        activeElement.value = value.slice(0, start) + 'q' + value.slice(end);
-                        
-                        // Обновляем позицию курсора
-                        activeElement.selectionStart = activeElement.selectionEnd = start + 1;
-                        
-                        // Создаем событие input для обновления значения
-                        const inputEvent = new Event('input', { bubbles: true });
-                        activeElement.dispatchEvent(inputEvent);
+                        // Добавляем дополнительные свойства для некоторых фреймворков
+                        Object.defineProperties(evt, {
+                            keyCode: { value: 81 },
+                            which: { value: 81 },
+                            key: { value: key },
+                            code: { value: 'KeyQ' }
+                        });
+
+                        element.dispatchEvent(evt);
+                        return evt;
                     }
 
-                    // В любом случае отправляем события keydown/keyup
-                    const target = activeElement || document;
+                    // Определяем цель для событий
+                    let target = activeElement;
                     
-                    // Создаем и отправляем keydown event
-                    const downEvent = new KeyboardEvent('keydown', {
-                        key: 'q',
-                        code: 'KeyQ',
-                        keyCode: 81,
-                        which: 81,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    target.dispatchEvent(downEvent);
+                    // Если активный элемент внутри iframe или похож на редактор
+                    if (activeElement && (
+                        activeElement.tagName === 'IFRAME' || 
+                        activeElement.getAttribute('role') === 'textbox' ||
+                        activeElement.classList.contains('public-DraftEditor-content') ||
+                        activeElement.contentEditable === 'true'
+                    )) {
+                        console.log('Found editor element:', activeElement);
+                        
+                        // Для contentEditable и DraftJS
+                        if (activeElement.contentEditable === 'true' || 
+                            activeElement.classList.contains('public-DraftEditor-content')) {
+                            // Создаем текстовый узел
+                            const textNode = document.createTextNode('q');
+                            
+                            // Пытаемся вставить текст через execCommand
+                            document.execCommand('insertText', false, 'q');
+                            
+                            // Также пробуем через selection API
+                            const selection = window.getSelection();
+                            if (selection && selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                range.deleteContents();
+                                range.insertNode(textNode);
+                                
+                                // Перемещаем курсор в конец
+                                range.setStartAfter(textNode);
+                                range.setEndAfter(textNode);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
+                        }
+                    }
 
-                    // Создаем и отправляем keypress event для символьных клавиш
-                    const pressEvent = new KeyboardEvent('keypress', {
-                        key: 'q',
-                        code: 'KeyQ',
-                        keyCode: 81,
-                        which: 81,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    target.dispatchEvent(pressEvent);
-
-                    // Создаем и отправляем keyup event
-                    const upEvent = new KeyboardEvent('keyup', {
-                        key: 'q',
-                        code: 'KeyQ',
-                        keyCode: 81,
-                        which: 81,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    target.dispatchEvent(upEvent);
+                    // В любом случае отправляем последовательность событий
+                    sendKeyEvent(target || document, 'keydown', 'q');
+                    sendKeyEvent(target || document, 'keypress', 'q');
+                    sendKeyEvent(target || document, 'input', 'q');
+                    sendKeyEvent(target || document, 'keyup', 'q');
+                    
+                    // Создаем событие input для обновления значения
+                    const inputEvent = new Event('input', { bubbles: true, composed: true });
+                    target.dispatchEvent(inputEvent);
+                    
+                    // Создаем событие change для некоторых фреймворков
+                    const changeEvent = new Event('change', { bubbles: true, composed: true });
+                    target.dispatchEvent(changeEvent);
                     
                     console.log('Q key press completed');
                 })();
