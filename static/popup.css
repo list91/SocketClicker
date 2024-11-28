@@ -56,12 +56,45 @@ input:checked + .slider:before {
     margin: 5px;
 }
 
+body {
+    width: 300px;
+    padding: 10px;
+    font-family: Arial, sans-serif;
+}
+
 .container {
-    padding: 15px;
-    min-width: 200px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
+}
+
+#inputField {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#startButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#startButton:hover {
+    background-color: #45a049;
+}
+
+.log-output {
+    border: 1px solid #ddd;
+    padding: 10px;
+    height: 150px;
+    overflow-y: auto;
+    background-color: #f1f1f1;
+    font-family: monospace;
+    font-size: 12px;
 }
 
 .screenshot-btn {

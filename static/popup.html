@@ -1,46 +1,16 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>My popup</title>
+    <meta charset="UTF-8">
+    <title>Socket Clicker</title>
     <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
     <div class="container">
-        <div class="switch-container">
-            <label>Enable Extension</label>
-            <label class="switch">
-                <input id="enabled" type="checkbox">
-                <span class="slider round"></span>
-            </label>
-        </div>
-        
-        <div class="switch-container">
-            <label>Auto Press Q</label>
-            <label class="switch">
-                <input id="autoQ" type="checkbox">
-                <span class="slider round"></span>
-            </label>
-        </div>
-
-        <input class="secret" id="item" type="text">
-        <button id="screenshot" class="screenshot-btn">Take Screenshot</button>
+        <input type="text" id="inputField" placeholder="Enter your command">
+        <button id="startButton">Start</button>
+        <div id="logOutput" class="log-output"></div>
     </div>
-    <script>
-        // Добавляем обработчик ошибок
-        window.onerror = function(msg, url, line, col, error) {
-            alert('Error: ' + msg + '\nLine: ' + line);
-            return false;
-        };
-        
-        // Проверяем загрузку popup.js
-        var script = document.createElement('script');
-        script.src = 'popup.js';
-        script.onerror = function() {
-            alert('Failed to load popup.js');
-        };
-        script.onload = function() {
-            alert('popup.js loaded successfully');
-        };
-        document.body.appendChild(script);
-    </script>
+    <script src="popup.js"></script>
 </body>
 </html>
