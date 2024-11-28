@@ -1,160 +1,95 @@
 import { browser } from 'webextension-polyfill-ts';
+import { WebInteractions } from './webInteractions';
 
-// Немедленно выводим сообщение при загрузке скрипта
-alert('Content Script Loaded!');
-console.log('%c Content Script Loaded! ', 'background: #222; color: #bada55; font-size: 30px;');
+console.log('Content script loaded');
 
-let pressInterval: number | null = null;
-
-// Вывод информации о загрузке скрипта
-console.log('=== Content Script Details ===');
-console.log('URL:', window.location.href);
-console.log('Time:', new Date().toLocaleString());
-console.log('Document Ready State:', document.readyState);
-
-// Функция для эмуляции нажатия клавиши Q
-function pressQ() {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] Pressing Q key`);
-    
+// Функция для безопасного выполнения XPath клика
+async function safeXPathClick(xpath: string) {
     try {
-        // Создаем и отправляем keydown event
-        const event = new KeyboardEvent('keydown', {
-            key: 'q',
-            code: 'KeyQ',
-            keyCode: 81,
-            which: 81,
-            bubbles: true,
-            cancelable: true
-        });
-        const keydownSuccess = document.dispatchEvent(event);
-        console.log('Keydown event dispatched:', keydownSuccess);
-
-        // Создаем и отправляем keyup event
-        const upEvent = new KeyboardEvent('keyup', {
-            key: 'q',
-            code: 'KeyQ',
-            keyCode: 81,
-            which: 81,
-            bubbles: true,
-            cancelable: true
-        });
-        const keyupSuccess = document.dispatchEvent(upEvent);
-        console.log('Keyup event dispatched:', keyupSuccess);
+        console.log(`Attempting to click XPath: ${xpath}`);
         
-        console.log(`[${timestamp}] Q key press completed`);
+        const xpathResult = document.evaluate(
+            xpath, 
+            document, 
+            null, 
+            XPathResult.FIRST_ORDERED_NODE_TYPE, 
+            null
+        );
+
+        const element = xpathResult.singleNodeValue as HTMLElement;
+
+        if (!element) {
+            console.error('No element found by XPath');
+            return { 
+                success: false, 
+                error: 'No element found',
+                details: {
+                    currentUrl: document.location.href,
+                    documentReadyState: document.readyState
+                }
+            };
+        }
+
+        // Прокрутка к элементу
+        (element as HTMLElement).scrollIntoView({ behavior: 'auto', block: 'center' });
+
+        // Симуляция клика
+        const mouseEvent = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: true
+        });
+        element.dispatchEvent(mouseEvent);
+
+        return { 
+            success: true, 
+            message: 'Element clicked successfully',
+            details: {
+                tagName: (element as HTMLElement).tagName,
+                currentUrl: document.location.href
+            }
+        };
     } catch (error) {
-        console.error('Error during key press:', error);
-        alert('Error during key press: ' + error);
+        console.error('Error in XPath click:', error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Unknown error',
+            details: {
+                currentUrl: document.location.href
+            }
+        };
     }
 }
 
-// Функция для ввода текста с имитацией нажатия клавиш
-function typeText(text: string) {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] Typing text: ${text}`);
+// Установка слушателя сообщений с расширенной обработкой
+function setupMessageListener() {
+    console.log('Setting up message listener in content script');
     
-    try {
-        // Получаем активный элемент ввода
-        const activeInput = document.activeElement as HTMLInputElement;
+    browser.runtime.onMessage.addListener(async (message: { action: string; value?: boolean; text?: string; xpath?: string }) => {
+        console.log('Content script received message:', JSON.stringify(message));
         
-        if (!activeInput) {
-            console.error('No active input element found');
-            return false;
-        }
-
-        // Очищаем существующий текст
-        activeInput.value = '';
-
-        // Вводим текст посимвольно
-        for (const char of text) {
-            // Создаем события для каждого символа
-            const keydownEvent = new KeyboardEvent('keydown', {
-                key: char,
-                bubbles: true,
-                cancelable: true
-            });
+        try {
+            if (message.action === 'clickByXPath' && message.xpath) {
+                console.log(`Processing XPath click: ${message.xpath}`);
+                return await safeXPathClick(message.xpath);
+            }
             
-            const inputEvent = new InputEvent('input', {
-                bubbles: true,
-                cancelable: true
-            });
-
-            const keyupEvent = new KeyboardEvent('keyup', {
-                key: char,
-                bubbles: true,
-                cancelable: true
-            });
-
-            // Диспетчеризация событий
-            activeInput.dispatchEvent(keydownEvent);
-            activeInput.value += char;
-            activeInput.dispatchEvent(inputEvent);
-            activeInput.dispatchEvent(keyupEvent);
+            return { success: false, error: 'Unknown action' };
+        } catch (error) {
+            console.error('Error in message handler:', error);
+            return { 
+                success: false, 
+                error: error instanceof Error ? error.message : 'Unknown error' 
+            };
         }
-
-        // Триггерим событие change
-        const changeEvent = new Event('change', { bubbles: true });
-        activeInput.dispatchEvent(changeEvent);
-
-        console.log(`[${timestamp}] Text typing completed`);
-        return true;
-    } catch (error) {
-        console.error('Error during text typing:', error);
-        return false;
-    }
-}
-
-// Функция для запуска интервала
-function startInterval() {
-    if (!pressInterval) {
-        console.log('%c Starting auto-press interval ', 'background: #222; color: #bada55');
-        alert('Starting auto-press interval');
-        pressQ(); // Сразу нажимаем один раз
-        pressInterval = window.setInterval(pressQ, 2000);
-        console.log('Interval ID:', pressInterval);
-    }
-}
-
-// Функция для остановки интервала
-function stopInterval() {
-    if (pressInterval) {
-        console.log('Stopping interval:', pressInterval);
-        clearInterval(pressInterval);
-        pressInterval = null;
-    }
-}
-
-// Запускаем нажатие Q когда документ загружен
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOMContentLoaded - starting interval');
-        startInterval();
     });
-} else {
-    console.log('Document already loaded - starting interval immediately');
-    startInterval();
 }
 
-// Для возможности остановки через popup оставляем слушатель сообщений
-browser.runtime.onMessage.addListener((message: { action: string; value?: boolean; text?: string }) => {
-    console.log('Message received:', message);
-    
-    if (message.action === 'toggleAutoQ') {
-        if (message.value) {
-            startInterval();
-        } else {
-            stopInterval();
-        }
-    } else if (message.action === 'typeText' && message.text) {
-        const result = typeText(message.text);
-        return Promise.resolve({ success: result });
-    }
-    return Promise.resolve({ success: false });
-});
+// Инициализация при загрузке документа
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMessageListener);
+} else {
+    setupMessageListener();
+}
 
-// Выводим сообщение при выгрузке скрипта
-window.addEventListener('unload', () => {
-    console.log('Content script unloading, cleaning up...');
-    stopInterval();
-});
+console.log('Content script initialization complete');

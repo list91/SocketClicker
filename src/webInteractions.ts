@@ -6,168 +6,73 @@ import { browser } from 'webextension-polyfill-ts';
 export class WebInteractions {
     /**
      * Клик по элементу, найденному по XPath с расширенной диагностикой
-     * @param tabId ID вкладки
      * @param xpath XPath селектор элемента
      * @returns Результат клика с диагностической информацией
      */
-    static async clickByXPath(tabId: number, xpath: string) {
-        console.log(`Clicking element by XPath "${xpath}" in tab ${tabId}`);
+    static async clickByXPath(xpath: string) {
+        console.log(`Clicking element by XPath "${xpath}"`);
         
         try {
-            const result = await browser.tabs.executeScript(tabId, {
+            // Получаем активную вкладку
+            const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+            const activeTab = tabs[0];
+
+            if (!activeTab || !activeTab.id) {
+                throw new Error('No active tab found');
+            }
+
+            const result = await browser.tabs.executeScript(activeTab.id, {
                 code: `
                     (function() {
                         console.log('Executing XPath click script');
                         try {
-                            // Максимально подробная отладка
                             console.log('Current document URL:', document.location.href);
                             console.log('Document ready state:', document.readyState);
                             
-                            // Проверка полного DOM
-                            const fullDomStructure = document.body ? 
-                                Array.from(document.body.children).map(el => el.tagName) : 
-                                'body not available';
-                            console.log('DOM top-level structure:', fullDomStructure);
-
-                            // Расширенная отладка XPath
                             const xpathResult = document.evaluate(
                                 "${xpath}", 
                                 document, 
                                 null, 
-                                XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, 
+                                XPathResult.FIRST_ORDERED_NODE_TYPE, 
                                 null
                             );
 
-                            console.log('XPath total matches:', xpathResult.snapshotLength);
-
-                            // Если нет совпадений
-                            if (xpathResult.snapshotLength === 0) {
-                                console.error('No elements found by XPath');
-                                
-                                // Попробуем альтернативные селекторы
-                                const divs = document.getElementsByTagName('div');
-                                console.log('Total div count:', divs.length);
-                                
-                                // Выводим первые 10 div для отладки
-                                const firstTenDivs = Array.from(divs).slice(0, 10).map((div, index) => ({
-                                    index,
-                                    tagName: div.tagName,
-                                    className: div.className,
-                                    id: div.id
-                                }));
-                                console.log('First 10 divs:', JSON.stringify(firstTenDivs));
-
-                                return { 
-                                    success: false, 
-                                    message: 'No elements found by XPath',
-                                    debugInfo: {
-                                        title: document.title,
-                                        url: document.location.href,
-                                        totalDivs: divs.length,
-                                        firstTenDivs: firstTenDivs
-                                    }
-                                };
-                            }
-
-                            // Берем первый найденный элемент
-                            const element = xpathResult.snapshotItem(0);
+                            const element = xpathResult.singleNodeValue;
 
                             if (!element) {
-                                console.error('First XPath element is null');
-                                return { 
-                                    success: false, 
-                                    message: 'First XPath element is null' 
-                                };
+                                console.error('No element found by XPath');
+                                return { success: false, error: 'No element found' };
                             }
 
-                            // Расширенная информация об элементе
-                            console.log('Element details:', {
-                                tagName: element.tagName,
-                                className: (element as HTMLElement).className,
-                                id: (element as HTMLElement).id,
-                                isVisible: window.getComputedStyle(element as Element).display !== 'none',
-                                isClickable: (element as HTMLElement).onclick !== null,
-                                parentTagName: (element.parentNode as Element)?.tagName,
-                                parentClassName: ((element.parentNode as HTMLElement)?.className || '')
-                            });
-
-                            // Прокручиваем к элементу
-                            (element as Element).scrollIntoView({ 
-                                behavior: 'auto', 
-                                block: 'center' 
-                            });
-
-                            // Симулируем клик через диспетчеризацию событий
-                            const mouseoverEvent = new MouseEvent('mouseover', {
+                            // Симуляция клика с событиями
+                            const mouseEvent = new MouseEvent('click', {
                                 view: window,
                                 bubbles: true,
                                 cancelable: true
                             });
+                            element.dispatchEvent(mouseEvent);
 
-                            const mousedownEvent = new MouseEvent('mousedown', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true,
-                                button: 0
-                            });
-
-                            const mouseupEvent = new MouseEvent('mouseup', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true,
-                                button: 0
-                            });
-
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true,
-                                button: 0
-                            });
-
-                            // Последовательность событий
-                            (element as Element).dispatchEvent(mouseoverEvent);
-                            (element as Element).dispatchEvent(mousedownEvent);
-                            (element as Element).dispatchEvent(mouseupEvent);
-                            (element as Element).dispatchEvent(clickEvent);
-
-                            // Пробуем вызвать click() напрямую
-                            if (typeof (element as HTMLElement).click === 'function') {
-                                (element as HTMLElement).click();
-                            }
-
-                            console.log('Click performed successfully');
                             return { 
                                 success: true, 
-                                message: 'Element clicked successfully',
-                                elementInfo: {
-                                    tagName: element.tagName,
-                                    className: (element as HTMLElement).className,
-                                    id: (element as HTMLElement).id,
-                                    parentTagName: (element.parentNode as Element)?.tagName,
-                                    parentClassName: ((element.parentNode as HTMLElement)?.className || '')
-                                }
+                                message: 'Element clicked successfully' 
                             };
                         } catch (error) {
-                            console.error('Error in XPath click script:', error);
+                            console.error('XPath click error:', error);
                             return { 
                                 success: false, 
-                                message: error.toString(),
-                                stack: error instanceof Error ? error.stack : undefined
+                                error: error.message 
                             };
                         }
                     })();
-                `,
-                runAt: 'document_end'
+                `
             });
 
-            console.log('ExecuteScript result:', JSON.stringify(result));
-            return result[0] || { success: false, message: 'No result from script' };
-        } catch (error) {
-            console.error('Error executing XPath click:', error);
+            return result[0];
+        } catch (error: unknown) {
+            console.error('Error in clickByXPath:', error);
             return { 
                 success: false, 
-                message: error instanceof Error ? error.message : 'Unknown error' 
+                error: error instanceof Error ? error.message : 'Unknown error' 
             };
         }
     }

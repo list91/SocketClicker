@@ -40,16 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Небольшая задержка после клика
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Затем вводим текст
-            log('Sending typeText message');
-            const typeResult = await browser.runtime.sendMessage({
-                action: 'typeText',
-                text: 'привет мир'
-            });
-
-            log(`Type result: ${JSON.stringify(typeResult)}`, 
-                typeResult?.success ? 'info' : 'error');
-
         } catch (error) {
             log(`Catch block error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
             console.error(error);  // Полный вывод ошибки в консоль
