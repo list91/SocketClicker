@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logEntry.classList.add(type);
         logOutput.appendChild(logEntry);
         logOutput.scrollTop = logOutput.scrollHeight;
-        console.log(message);  // Добавляем консольный лог
+        console.log(message);
     }
 
     startButton.addEventListener('click', async () => {
@@ -25,28 +25,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            log(`Active tab ID: ${tab.id}`);  // Логируем ID вкладки
+            log(`Active tab ID: ${tab.id}`);
 
-            // Сначала кликаем по XPath
-            log('Sending clickByXPath message');
+            // Send message to background script to handle web interactions
             const clickResult = await browser.runtime.sendMessage({
-                action: 'clickByXPath', 
-                xpath: '/html/body/div[1]/div/div/div[2]/header/div/div/div/div[1]/div[3]/a'
+                action: 'performWebActions'
             });
 
-            log(`Click result: ${JSON.stringify(clickResult)}`, 
+            log(`Action result: ${JSON.stringify(clickResult)}`, 
                 clickResult?.success ? 'info' : 'error');
-
-            // Небольшая задержка после клика
-            await new Promise(resolve => setTimeout(resolve, 500));
 
         } catch (error) {
             log(`Catch block error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-            console.error(error);  // Полный вывод ошибки в консоль
+            console.error(error);
         }
     });
 
-    // Добавляем обработку Enter в поле ввода
+    // Enter key handling remains the same
     inputField.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
             startButton.click();

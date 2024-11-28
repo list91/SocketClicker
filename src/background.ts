@@ -26,17 +26,29 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
             runAt: 'document_start'
         });
 
-        console.log(`Sending message to tab ${activeTab.id}`);
+        // Обработка различных действий
+        switch (message.action) {
+            case 'performWebActions':
+                console.log('Performing web actions');
+                
+                // Клик по XPath
+                const clickResult = await browser.tabs.sendMessage(activeTab.id, {
+                    action: 'clickByXPath',
+                    xpath: DEMO_XPATH
+                });
 
-        // Отправляем сообщение контент-скрипту для клика по XPath
-        const result = await browser.tabs.sendMessage(activeTab.id, {
-            action: 'clickByXPath',
-            xpath: DEMO_XPATH
-        });
+                // Небольшая задержка после клика
+                await new Promise(resolve => setTimeout(resolve, 500));
 
-        console.log('Message send result:', JSON.stringify(result));
+                return {
+                    success: clickResult?.success || false,
+                    message: 'Web actions completed'
+                };
 
-        return result;
+            default:
+                console.warn('Unknown action:', message.action);
+                return { success: false, error: 'Unknown action' };
+        }
     } catch (error: unknown) {
         console.error('Error in background script:', error);
         return { 
