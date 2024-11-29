@@ -15,14 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Обновляем текст метки
-    keyLabel.textContent = `Auto Press '${KEY_CONFIG.upperKey}'`;
+    const sequence = KEY_CONFIG.KEY_SEQUENCE.map(key => key.toUpperCase()).join(' + ');
+    keyLabel.textContent = `Auto Press '${sequence}'`;
 
     console.log('Elements found:', {
         autoKeyCheckbox: !!autoKeyCheckbox,
         keyLabel: !!keyLabel
     });
 
-    // Функция для включения/выключения автонажатия клавиши
+    // Функция для включения/выключения автонажатия клавиш
     async function toggleAutoPress(enabled: boolean) {
         console.log('Toggling auto press:', enabled);
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });

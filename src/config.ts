@@ -10,16 +10,22 @@ function getKeyInfo(key: string) {
     };
 }
 
+// Последовательность клавиш для автонажатия
+export const KEY_SEQUENCE = ['y', 'e', 's'];
+
 // Конфигурация клавиш
 export const KEY_CONFIG = {
-    // Клавиша для автонажатия (можно изменить на любую другую)
-    AUTO_PRESS_KEY: 'y',
+    // Последовательность клавиш для автонажатия
+    KEY_SEQUENCE,
     
-    // Интервал автонажатия в миллисекундах
-    PRESS_INTERVAL: 2000,
+    // Интервал между нажатиями в последовательности (мс)
+    KEY_SEQUENCE_INTERVAL: 100,
     
-    // Получаем информацию о клавише
-    ...getKeyInfo('y')
+    // Интервал между повторами всей последовательности (мс)
+    SEQUENCE_REPEAT_INTERVAL: 2000,
+    
+    // Информация о клавишах
+    KEYS_INFO: KEY_SEQUENCE.map(getKeyInfo)
 };
 
 // Типы сообщений
