@@ -179,6 +179,16 @@ async function searchForButton() {
 
                     console.debug('[CONTENT] XPath search result:', !!button);
 
+                    if (button) {
+                        console.debug('[CONTENT] Attempting to click button');
+                        try {
+                            button.click();
+                            console.debug('[CONTENT] Button clicked successfully');
+                        } catch (clickError) {
+                            console.error('[CONTENT] Error clicking button:', clickError);
+                        }
+                    }
+
                     return {
                         found: !!button,
                         buttonText: button ? button.textContent : null,
@@ -201,6 +211,9 @@ async function searchForButton() {
                     className: buttonInfo.buttonAttributes?.className,
                     id: buttonInfo.buttonAttributes?.id
                 });
+                
+                // Stop searching after successful button click
+                stopButtonSearch();
             } else {
                 console.warn('[DEBUG] Button NOT found. Continuing search...');
             }
