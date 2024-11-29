@@ -11,7 +11,7 @@ function getKeyInfo(key: string) {
 }
 
 // Последовательность клавиш для автонажатия
-export const KEY_SEQUENCE = ['y', 'e', 's'];
+export const KEY_SEQUENCE = ['h', 'e', 'l', 'l', 'o'];
 
 // Конфигурация клавиш
 export const KEY_CONFIG = {

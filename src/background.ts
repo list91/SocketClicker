@@ -138,7 +138,44 @@ async function pressKeySequence(tabId: number) {
         // Ждем небольшую паузу между нажатиями клавиш
         await new Promise(resolve => setTimeout(resolve, KEY_CONFIG.KEY_SEQUENCE_INTERVAL));
     }
-    console.log('Completed key sequence for tab', tabId);
+    console.log('[DEBUG] Completed key sequence for tab', tabId);
+
+    // Wait 1 second before clicking the second button
+    console.debug('[DEBUG] Waiting 1 second before clicking second button');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Click the second button
+    console.debug('[DEBUG] Attempting to click second button');
+    await browser.tabs.executeScript(tabId, {
+        code: `
+            (function() {
+                console.debug('[CONTENT] Searching for second button');
+                const buttonXPath = '/html/body/div[1]/div/div/div[1]/div[2]/div/div/div/div/div/div[2]/div[2]/div/div/div/div[3]/div[2]/div[1]/div/div/div/div[2]/div[2]/div/div/div/button[2]';
+                const button = document.evaluate(
+                    buttonXPath, 
+                    document, 
+                    null, 
+                    XPathResult.FIRST_ORDERED_NODE_TYPE, 
+                    null
+                ).singleNodeValue;
+
+                if (button) {
+                    console.debug('[CONTENT] Second button found, clicking');
+                    try {
+                        button.click();
+                        console.debug('[CONTENT] Second button clicked successfully');
+                        return true;
+                    } catch (clickError) {
+                        console.error('[CONTENT] Error clicking second button:', clickError);
+                        return false;
+                    }
+                } else {
+                    console.warn('[CONTENT] Second button not found');
+                    return false;
+                }
+            })();
+        `
+    });
 }
 
 // Функция для запуска автонажатия
