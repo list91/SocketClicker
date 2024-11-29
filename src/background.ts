@@ -7,28 +7,33 @@ let pressInterval: number | undefined;
 
 // Функция для эмуляции нажатия клавиши
 async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) {
-    console.debug('[DEBUG] Pressing key:', keyInfo.key);
+    console.debug(`[DEBUG] Pressing key: ${keyInfo.key} in tab ${tabId}`);
+    
     // Проверяем, включен ли автоввод в localStorage
     const isAutoKeyEnabled = localStorage.getItem('autoKeyEnabled') === 'true';
     
     if (!isAutoKeyEnabled) {
-        console.log('Auto press is disabled');
+        console.warn('[DEBUG] Auto press is disabled');
         return;
     }
 
-    console.log(`Pressing ${keyInfo.key} key in tab ${tabId}`);
+    console.log(`[DEBUG] Preparing to press ${keyInfo.key} key in tab ${tabId}`);
     
     try {
         // Выполняем скрипт в активной вкладке для симуляции нажатия клавиши
-        await browser.tabs.executeScript(tabId, {
+        const result = await browser.tabs.executeScript(tabId, {
             code: `
                 (function() {
-                    console.debug('[CONTENT] Simulating key press:', '${keyInfo.key}');
+                    console.debug('[CONTENT] Starting key press simulation for key: ${keyInfo.key}');
+                    
                     // Получаем активный элемент
                     const target = document.activeElement;
+                    console.debug('[CONTENT] Active element:', target ? target.tagName : 'No active element');
                     
                     // Функция для отправки события
                     function sendKeyEvent(element, eventType, key) {
+                        console.debug(\`[CONTENT] Sending \${eventType} event for key: \${key}\`);
+                        
                         const evt = new KeyboardEvent(eventType, {
                             key: key,
                             code: '${keyInfo.eventCode}',
@@ -48,7 +53,13 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                             code: { value: '${keyInfo.eventCode}' }
                         });
 
-                        element.dispatchEvent(evt);
+                        try {
+                            element.dispatchEvent(evt);
+                            console.debug(\`[CONTENT] Successfully dispatched \${eventType} event\`);
+                        } catch (dispatchError) {
+                            console.error(\`[CONTENT] Error dispatching \${eventType} event:\`, dispatchError);
+                        }
+                        
                         return evt;
                     }
 
@@ -58,15 +69,24 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                         const isTextField = target instanceof HTMLInputElement || 
                                          target instanceof HTMLTextAreaElement;
 
+                        console.debug('[CONTENT] Is text field:', isTextField);
+                        console.debug('[CONTENT] Is content editable:', target.isContentEditable);
+
                         // Проверяем редактируемые div-ы (например, contenteditable)
                         if (isTextField || target.isContentEditable || 
                             target.contentEditable === 'true' || 
                             target.classList.contains('public-DraftEditor-content')) {
+                            
+                            console.debug('[CONTENT] Attempting to insert text');
+                            
                             // Пытаемся вставить текст через execCommand
                             const execCommandSuccess = document.execCommand('insertText', false, '${keyInfo.key}');
                             
+                            console.debug('[CONTENT] execCommand insertion result:', execCommandSuccess);
+                            
                             if (!execCommandSuccess) {
                                 // Если execCommand не сработал, используем Selection API
+                                console.debug('[CONTENT] Falling back to Selection API');
                                 const textNode = document.createTextNode('${keyInfo.key}');
                                 const selection = window.getSelection();
                                 if (selection && selection.rangeCount > 0) {
@@ -76,6 +96,7 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                                     range.collapse(false);
                                     selection.removeAllRanges();
                                     selection.addRange(range);
+                                    console.debug('[CONTENT] Successfully inserted text via Selection API');
                                 }
                             }
                         }
@@ -90,17 +111,22 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                     // Создаем событие input для обновления значения
                     const inputEvent = new Event('input', { bubbles: true, composed: true });
                     target.dispatchEvent(inputEvent);
+                    console.debug('[CONTENT] Dispatched input event');
                     
                     // Создаем событие change для обновления значения
                     const changeEvent = new Event('change', { bubbles: true, composed: true });
                     target.dispatchEvent(changeEvent);
+                    console.debug('[CONTENT] Dispatched change event');
                     
-                    console.debug('[CONTENT] Key press completed');
+                    console.debug('[CONTENT] Key press simulation completed for key: ${keyInfo.key}');
+                    return true;
                 })();
             `
         });
+
+        console.log(`[DEBUG] Key press result for ${keyInfo.key}:`, result);
     } catch (error) {
-        console.error('Error pressing key:', error);
+        console.error(`[DEBUG] Error pressing key ${keyInfo.key}:`, error);
     }
 }
 
@@ -184,41 +210,44 @@ async function searchForButton() {
                         try {
                             button.click();
                             console.debug('[CONTENT] Button clicked successfully');
+                            return true;
                         } catch (clickError) {
                             console.error('[CONTENT] Error clicking button:', clickError);
+                            return false;
                         }
                     }
-
-                    return {
-                        found: !!button,
-                        buttonText: button ? button.textContent : null,
-                        buttonAttributes: button ? {
-                            href: button.getAttribute('href'),
-                            className: button.className,
-                            id: button.id
-                        } : null
-                    };
+                    return false;
                 })();
             `
         });
 
-        if (result && result[0]) {
-            const buttonInfo = result[0];
-            if (buttonInfo.found) {
-                console.log('[DEBUG] Button FOUND! Details:', {
-                    text: buttonInfo.buttonText,
-                    href: buttonInfo.buttonAttributes?.href,
-                    className: buttonInfo.buttonAttributes?.className,
-                    id: buttonInfo.buttonAttributes?.id
-                });
-                
-                // Stop searching after successful button click
-                stopButtonSearch();
-            } else {
-                console.warn('[DEBUG] Button NOT found. Continuing search...');
-            }
+        if (result && result[0] === true) {
+            console.log('[DEBUG] Button found and clicked successfully');
+            
+            // Stop searching after successful button click
+            stopButtonSearch();
+
+            // Enable auto press
+            console.debug('[DEBUG] Enabling auto press for delayed sequence');
+            localStorage.setItem('autoKeyEnabled', 'true');
+
+            // Schedule key sequence after 4 seconds
+            setTimeout(async () => {
+                console.debug('[DEBUG] Executing delayed key sequence');
+                const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+                const tab = tabs[0];
+
+                if (tab && tab.id) {
+                    await pressKeySequence(tab.id);
+                    // Disable auto press after sequence is complete
+                    console.debug('[DEBUG] Disabling auto press after sequence completion');
+                    localStorage.setItem('autoKeyEnabled', 'false');
+                } else {
+                    console.error('[DEBUG] No active tab found for key sequence');
+                }
+            }, 4000);
         } else {
-            console.warn('[DEBUG] No result returned from button search');
+            console.warn('[DEBUG] Button NOT found or click failed. Continuing search...');
         }
     } catch (error) {
         console.error('[DEBUG] Error in button search:', error);
