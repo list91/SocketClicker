@@ -1,12 +1,13 @@
 import { browser } from 'webextension-polyfill-ts';
+import { KEY_CONFIG, MessageType } from './config';
 
 console.log('Background script loaded');
 
 let pressInterval: number | null = null;
 
-// Функция для эмуляции нажатия клавиши R
-async function pressR(tabId: number) {
-    console.log(`Pressing R key in tab ${tabId}`);
+// Функция для эмуляции нажатия клавиши
+async function pressKey(tabId: number) {
+    console.log(`Pressing ${KEY_CONFIG.key} key in tab ${tabId}`);
     
     try {
         // Выполняем скрипт в активной вкладке для симуляции нажатия клавиши
@@ -21,9 +22,9 @@ async function pressR(tabId: number) {
                     function sendKeyEvent(element, eventType, key) {
                         const evt = new KeyboardEvent(eventType, {
                             key: key,
-                            code: 'KeyR',
-                            keyCode: 82,
-                            which: 82,
+                            code: '${KEY_CONFIG.eventCode}',
+                            keyCode: ${KEY_CONFIG.keyCode},
+                            which: ${KEY_CONFIG.keyCode},
                             bubbles: true,
                             cancelable: true,
                             composed: true,
@@ -32,10 +33,10 @@ async function pressR(tabId: number) {
                         
                         // Добавляем дополнительные свойства для некоторых фреймворков
                         Object.defineProperties(evt, {
-                            keyCode: { value: 82 },
-                            which: { value: 82 },
+                            keyCode: { value: ${KEY_CONFIG.keyCode} },
+                            which: { value: ${KEY_CONFIG.keyCode} },
                             key: { value: key },
-                            code: { value: 'KeyR' }
+                            code: { value: '${KEY_CONFIG.eventCode}' }
                         });
 
                         element.dispatchEvent(evt);
@@ -58,10 +59,10 @@ async function pressR(tabId: number) {
                         if (activeElement.contentEditable === 'true' || 
                             activeElement.classList.contains('public-DraftEditor-content')) {
                             // Создаем текстовый узел
-                            const textNode = document.createTextNode('r');
+                            const textNode = document.createTextNode('${KEY_CONFIG.key}');
                             
                             // Пытаемся вставить текст через execCommand
-                            document.execCommand('insertText', false, 'r');
+                            document.execCommand('insertText', false, '${KEY_CONFIG.key}');
                             
                             // Также пробуем через selection API
                             const selection = window.getSelection();
@@ -80,10 +81,10 @@ async function pressR(tabId: number) {
                     }
 
                     // В любом случае отправляем последовательность событий
-                    sendKeyEvent(target || document, 'keydown', 'r');
-                    sendKeyEvent(target || document, 'keypress', 'r');
-                    sendKeyEvent(target || document, 'input', 'r');
-                    sendKeyEvent(target || document, 'keyup', 'r');
+                    sendKeyEvent(target || document, 'keydown', '${KEY_CONFIG.key}');
+                    sendKeyEvent(target || document, 'keypress', '${KEY_CONFIG.key}');
+                    sendKeyEvent(target || document, 'input', '${KEY_CONFIG.key}');
+                    sendKeyEvent(target || document, 'keyup', '${KEY_CONFIG.key}');
                     
                     // Создаем событие input для обновления значения
                     const inputEvent = new Event('input', { bubbles: true, composed: true });
@@ -93,7 +94,7 @@ async function pressR(tabId: number) {
                     const changeEvent = new Event('change', { bubbles: true, composed: true });
                     target.dispatchEvent(changeEvent);
                     
-                    console.log('R key press completed');
+                    console.log('${KEY_CONFIG.key} key press completed');
                 })();
             `
         });
@@ -106,8 +107,8 @@ async function pressR(tabId: number) {
 async function startInterval(tabId: number) {
     if (!pressInterval) {
         console.log('Starting auto-press interval for tab', tabId);
-        await pressR(tabId); // Сразу нажимаем один раз
-        pressInterval = window.setInterval(() => pressR(tabId), 2000);
+        await pressKey(tabId); // Сразу нажимаем один раз
+        pressInterval = window.setInterval(() => pressKey(tabId), KEY_CONFIG.PRESS_INTERVAL);
         console.log('Interval ID:', pressInterval);
     }
 }
@@ -147,10 +148,10 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 });
 
 // Обработчик сообщений от popup
-browser.runtime.onMessage.addListener(async (message: { action: string; value?: boolean; type?: string; data?: any }) => {
+browser.runtime.onMessage.addListener(async (message: MessageType) => {
     console.log('Background received message:', message);
     
-    if (message.action === 'toggleAutoR') {
+    if (message.action === 'toggleAutoPress') {
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });
         if (tabs[0] && tabs[0].id) {
             if (message.value) {
