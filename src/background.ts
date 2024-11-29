@@ -1,59 +1,165 @@
 import { browser } from 'webextension-polyfill-ts';
-import { WebInteractions } from './webInteractions';
 
 console.log('Background script loaded');
 
-// Обработчик сообщений от popup
-browser.runtime.onMessage.addListener(async (message, sender) => {
-    // Временный XPath для демонстрации (можно изменить под конкретный сайт)
-    const DEMO_XPATH = '/html/body/div[1]/div/div/div[2]/header/div/div/div/div[1]/div[3]/a';
+let pressInterval: number | null = null;
 
+// Функция для эмуляции нажатия клавиши R
+async function pressR(tabId: number) {
+    console.log(`Pressing R key in tab ${tabId}`);
+    
     try {
-        // Получаем активную вкладку
-        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-        const activeTab = tabs[0];
+        // Выполняем скрипт в активной вкладке для симуляции нажатия клавиши
+        await browser.tabs.executeScript(tabId, {
+            code: `
+                (function() {
+                    // Получаем активный элемент
+                    const activeElement = document.activeElement;
+                    console.log('Active element:', activeElement);
 
-        if (!activeTab || !activeTab.id) {
-            console.error('No active tab found');
-            return { success: false, error: 'No active tab' };
-        }
+                    // Функция для отправки события
+                    function sendKeyEvent(element, eventType, key) {
+                        const evt = new KeyboardEvent(eventType, {
+                            key: key,
+                            code: 'KeyR',
+                            keyCode: 82,
+                            which: 82,
+                            bubbles: true,
+                            cancelable: true,
+                            composed: true,
+                            view: window
+                        });
+                        
+                        // Добавляем дополнительные свойства для некоторых фреймворков
+                        Object.defineProperties(evt, {
+                            keyCode: { value: 82 },
+                            which: { value: 82 },
+                            key: { value: key },
+                            code: { value: 'KeyR' }
+                        });
 
-        console.log(`Attempting to inject content script into tab ${activeTab.id}`);
+                        element.dispatchEvent(evt);
+                        return evt;
+                    }
 
-        // Принудительная инъекция контент-скрипта
-        await browser.tabs.executeScript(activeTab.id, {
-            file: 'content.js',
-            runAt: 'document_start'
+                    // Определяем цель для событий
+                    let target = activeElement;
+                    
+                    // Если активный элемент внутри iframe или похож на редактор
+                    if (activeElement && (
+                        activeElement.tagName === 'IFRAME' || 
+                        activeElement.getAttribute('role') === 'textbox' ||
+                        activeElement.classList.contains('public-DraftEditor-content') ||
+                        activeElement.contentEditable === 'true'
+                    )) {
+                        console.log('Found editor element:', activeElement);
+                        
+                        // Для contentEditable и DraftJS
+                        if (activeElement.contentEditable === 'true' || 
+                            activeElement.classList.contains('public-DraftEditor-content')) {
+                            // Создаем текстовый узел
+                            const textNode = document.createTextNode('r');
+                            
+                            // Пытаемся вставить текст через execCommand
+                            document.execCommand('insertText', false, 'r');
+                            
+                            // Также пробуем через selection API
+                            const selection = window.getSelection();
+                            if (selection && selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                range.deleteContents();
+                                range.insertNode(textNode);
+                                
+                                // Перемещаем курсор в конец
+                                range.setStartAfter(textNode);
+                                range.setEndAfter(textNode);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
+                        }
+                    }
+
+                    // В любом случае отправляем последовательность событий
+                    sendKeyEvent(target || document, 'keydown', 'r');
+                    sendKeyEvent(target || document, 'keypress', 'r');
+                    sendKeyEvent(target || document, 'input', 'r');
+                    sendKeyEvent(target || document, 'keyup', 'r');
+                    
+                    // Создаем событие input для обновления значения
+                    const inputEvent = new Event('input', { bubbles: true, composed: true });
+                    target.dispatchEvent(inputEvent);
+                    
+                    // Создаем событие change для некоторых фреймворков
+                    const changeEvent = new Event('change', { bubbles: true, composed: true });
+                    target.dispatchEvent(changeEvent);
+                    
+                    console.log('R key press completed');
+                })();
+            `
         });
-
-        // Обработка различных действий
-        switch (message.action) {
-            case 'performWebActions':
-                console.log('Performing web actions');
-                
-                // Клик по XPath
-                const clickResult = await browser.tabs.sendMessage(activeTab.id, {
-                    action: 'clickByXPath',
-                    xpath: DEMO_XPATH
-                });
-
-                // Небольшая задержка после клика
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                return {
-                    success: clickResult?.success || false,
-                    message: 'Web actions completed'
-                };
-
-            default:
-                console.warn('Unknown action:', message.action);
-                return { success: false, error: 'Unknown action' };
-        }
-    } catch (error: unknown) {
-        console.error('Error in background script:', error);
-        return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-        };
+    } catch (error) {
+        console.error('Error during key press:', error);
     }
+}
+
+// Функция для запуска интервала
+async function startInterval(tabId: number) {
+    if (!pressInterval) {
+        console.log('Starting auto-press interval for tab', tabId);
+        await pressR(tabId); // Сразу нажимаем один раз
+        pressInterval = window.setInterval(() => pressR(tabId), 2000);
+        console.log('Interval ID:', pressInterval);
+    }
+}
+
+// Функция для остановки интервала
+function stopInterval() {
+    if (pressInterval) {
+        console.log('Stopping interval:', pressInterval);
+        clearInterval(pressInterval);
+        pressInterval = null;
+    }
+}
+
+// При установке или обновлении расширения
+browser.runtime.onInstalled.addListener(() => {
+    console.log('Extension installed/updated');
+});
+
+// Слушаем изменения активной вкладки
+browser.tabs.onActivated.addListener(async (activeInfo) => {
+    console.log('Tab activated:', activeInfo.tabId);
+    // Останавливаем предыдущий интервал
+    stopInterval();
+    // Запускаем новый интервал для активной вкладки
+    await startInterval(activeInfo.tabId);
+});
+
+// При обновлении вкладки
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.active) {
+        console.log('Active tab updated:', tabId);
+        // Останавливаем предыдущий интервал
+        stopInterval();
+        // Запускаем новый интервал для обновленной вкладки
+        await startInterval(tabId);
+    }
+});
+
+// Обработчик сообщений от popup
+browser.runtime.onMessage.addListener(async (message: { action: string; value?: boolean; type?: string; data?: any }) => {
+    console.log('Background received message:', message);
+    
+    if (message.action === 'toggleAutoR') {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0] && tabs[0].id) {
+            if (message.value) {
+                await startInterval(tabs[0].id);
+            } else {
+                stopInterval();
+            }
+        }
+    }
+    
+    return Promise.resolve({ success: true });
 });

@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputField = document.getElementById('inputField') as HTMLInputElement;
     const startButton = document.getElementById('startButton') as HTMLButtonElement;
     const logOutput = document.getElementById('logOutput') as HTMLDivElement;
+    const autoRCheckbox = document.getElementById('autoR') as HTMLInputElement;
 
     function log(message: string, type: 'info' | 'error' = 'info') {
         const logEntry = document.createElement('div');
@@ -46,5 +47,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Enter') {
             startButton.click();
         }
+    });
+
+    // Функция для включения/выключения автонажатия клавиши R
+    async function toggleAutoR(enabled: boolean) {
+        console.log('Toggling auto R:', enabled);
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0] && tabs[0].id) {
+            await browser.runtime.sendMessage({
+                action: 'toggleAutoR',
+                value: enabled
+            });
+        }
+    }
+
+    // Слушаем изменения чекбокса
+    autoRCheckbox.addEventListener('change', () => {
+        const isEnabled = autoRCheckbox.checked;
+        console.log('Auto R checkbox changed to:', isEnabled);
+        toggleAutoR(isEnabled);
     });
 });
