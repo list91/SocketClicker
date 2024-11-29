@@ -52,21 +52,21 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                         if (isTextField || target.isContentEditable || 
                             target.contentEditable === 'true' || 
                             target.classList.contains('public-DraftEditor-content')) {
-                            // Создаем текстовый узел
-                            const textNode = document.createTextNode('${keyInfo.key}');
-                            
                             // Пытаемся вставить текст через execCommand
-                            document.execCommand('insertText', false, '${keyInfo.key}');
+                            const execCommandSuccess = document.execCommand('insertText', false, '${keyInfo.key}');
                             
-                            // Также пробуем через selection API
-                            const selection = window.getSelection();
-                            if (selection && selection.rangeCount > 0) {
-                                const range = selection.getRangeAt(0);
-                                range.deleteContents();
-                                range.insertNode(textNode);
-                                range.collapse(false);
-                                selection.removeAllRanges();
-                                selection.addRange(range);
+                            if (!execCommandSuccess) {
+                                // Если execCommand не сработал, используем Selection API
+                                const textNode = document.createTextNode('${keyInfo.key}');
+                                const selection = window.getSelection();
+                                if (selection && selection.rangeCount > 0) {
+                                    const range = selection.getRangeAt(0);
+                                    range.deleteContents();
+                                    range.insertNode(textNode);
+                                    range.collapse(false);
+                                    selection.removeAllRanges();
+                                    selection.addRange(range);
+                                }
                             }
                         }
                     }
@@ -96,11 +96,13 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
 
 // Функция для нажатия последовательности клавиш
 async function pressKeySequence(tabId: number) {
+    console.log('Starting key sequence for tab', tabId);
     for (const keyInfo of KEY_CONFIG.KEYS_INFO) {
         await pressKey(tabId, keyInfo);
         // Ждем небольшую паузу между нажатиями клавиш
         await new Promise(resolve => setTimeout(resolve, KEY_CONFIG.KEY_SEQUENCE_INTERVAL));
     }
+    console.log('Completed key sequence for tab', tabId);
 }
 
 // Функция для запуска автонажатия
@@ -108,8 +110,13 @@ async function startAutoPress(tabId: number) {
     if (!pressInterval) {
         console.log('Starting auto-press sequence for tab', tabId);
         await pressKeySequence(tabId); // Сразу нажимаем один раз
-        pressInterval = window.setInterval(() => pressKeySequence(tabId), KEY_CONFIG.SEQUENCE_REPEAT_INTERVAL);
+        pressInterval = window.setInterval(() => {
+            console.log('Repeating key sequence for tab', tabId);
+            pressKeySequence(tabId);
+        }, KEY_CONFIG.SEQUENCE_REPEAT_INTERVAL);
         console.log('Interval ID:', pressInterval);
+    } else {
+        console.log('Auto-press already running for tab', tabId);
     }
 }
 
