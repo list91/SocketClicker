@@ -15,10 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Восстанавливаем состояние чекбокса из localStorage
-    const savedState = localStorage.getItem('autoKeyEnabled');
-    if (savedState !== null) {
-        autoKeyCheckbox.checked = savedState === 'true';
-    }
+    const savedState = localStorage.getItem('autoKeyEnabled') === 'true';
+    autoKeyCheckbox.checked = savedState;
 
     // Обновляем текст метки
     const sequence = KEY_CONFIG.KEY_SEQUENCE.map(key => key.toUpperCase()).join(' + ');
@@ -43,9 +41,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Слушаем изменения чекбокса
-    autoKeyCheckbox.addEventListener('change', () => {
+    autoKeyCheckbox.addEventListener('change', async () => {
         const isEnabled = autoKeyCheckbox.checked;
-        console.log('Auto press checkbox changed to:', isEnabled);
-        toggleAutoPress(isEnabled);
+
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('autoKeyEnabled', isEnabled.toString());
+
+        // Отправляем сообщение в background скрипт
+        try {
+            await browser.runtime.sendMessage({
+                action: 'toggleAutoPress',
+                value: isEnabled
+            });
+        } catch (error) {
+            console.error('Error sending toggle message:', error);
+        }
     });
 });

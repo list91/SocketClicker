@@ -7,6 +7,14 @@ let pressInterval: number | undefined;
 
 // Функция для эмуляции нажатия клавиши
 async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) {
+    // Проверяем, включен ли автоввод в localStorage
+    const isAutoKeyEnabled = localStorage.getItem('autoKeyEnabled') === 'true';
+    
+    if (!isAutoKeyEnabled) {
+        console.log('Auto press is disabled');
+        return;
+    }
+
     console.log(`Pressing ${keyInfo.key} key in tab ${tabId}`);
     
     try {
@@ -107,6 +115,14 @@ async function pressKeySequence(tabId: number) {
 
 // Функция для запуска автонажатия
 async function startAutoPress(tabId: number) {
+    // Проверяем, включен ли автоввод в localStorage
+    const isAutoKeyEnabled = localStorage.getItem('autoKeyEnabled') === 'true';
+    
+    if (!isAutoKeyEnabled) {
+        console.log('Auto press is disabled, not starting');
+        return;
+    }
+
     if (!pressInterval) {
         console.log('Starting auto-press sequence for tab', tabId);
         await pressKeySequence(tabId); // Сразу нажимаем один раз
@@ -132,6 +148,8 @@ function stopAutoPress() {
 // При установке или обновлении расширения
 browser.runtime.onInstalled.addListener(() => {
     console.log('Extension installed/updated');
+    // Сбрасываем состояние автонажатия при установке
+    localStorage.removeItem('autoKeyEnabled');
 });
 
 // Слушаем изменения активной вкладки
