@@ -7,6 +7,7 @@ let pressInterval: number | undefined;
 
 // Функция для эмуляции нажатия клавиши
 async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) {
+    console.debug('[DEBUG] Pressing key:', keyInfo.key);
     // Проверяем, включен ли автоввод в localStorage
     const isAutoKeyEnabled = localStorage.getItem('autoKeyEnabled') === 'true';
     
@@ -22,6 +23,7 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
         await browser.tabs.executeScript(tabId, {
             code: `
                 (function() {
+                    console.debug('[CONTENT] Simulating key press:', '${keyInfo.key}');
                     // Получаем активный элемент
                     const target = document.activeElement;
                     
@@ -93,7 +95,7 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
                     const changeEvent = new Event('change', { bubbles: true, composed: true });
                     target.dispatchEvent(changeEvent);
                     
-                    console.log('${keyInfo.key} key press completed');
+                    console.debug('[CONTENT] Key press completed');
                 })();
             `
         });
@@ -104,7 +106,7 @@ async function pressKey(tabId: number, keyInfo: typeof KEY_CONFIG.KEYS_INFO[0]) 
 
 // Функция для нажатия последовательности клавиш
 async function pressKeySequence(tabId: number) {
-    console.log('Starting key sequence for tab', tabId);
+    console.debug('[DEBUG] Starting key sequence for tab', tabId);
     for (const keyInfo of KEY_CONFIG.KEYS_INFO) {
         await pressKey(tabId, keyInfo);
         // Ждем небольшую паузу между нажатиями клавиш
@@ -115,6 +117,7 @@ async function pressKeySequence(tabId: number) {
 
 // Функция для запуска автонажатия
 async function startAutoPress(tabId: number) {
+    console.debug('[DEBUG] Starting auto press for tab', tabId);
     // Проверяем, включен ли автоввод в localStorage
     const isAutoKeyEnabled = localStorage.getItem('autoKeyEnabled') === 'true';
     
@@ -138,6 +141,7 @@ async function startAutoPress(tabId: number) {
 
 // Функция для остановки автонажатия
 function stopAutoPress() {
+    console.debug('[DEBUG] Stopping auto press');
     if (pressInterval) {
         console.log('Stopping auto-press with interval ID:', pressInterval);
         window.clearInterval(pressInterval);
@@ -145,9 +149,143 @@ function stopAutoPress() {
     }
 }
 
+// Function to search for the specific button
+async function searchForButton() {
+    console.debug('[DEBUG] Starting button search process');
+    try {
+        console.debug('[DEBUG] Querying active tabs');
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+
+        if (!tab || !tab.id) {
+            console.error('[DEBUG] No active tab found');
+            return;
+        }
+
+        console.debug(`[DEBUG] Active tab ID: ${tab.id}, URL: ${tab.url}`);
+
+        const result = await browser.tabs.executeScript(tab.id, {
+            code: `
+                (function() {
+                    console.debug('[CONTENT] Searching for button with XPath');
+                    const buttonXPath = '/html/body/div[1]/div/div/div[2]/header/div/div/div/div[1]/div[3]/a';
+                    const button = document.evaluate(
+                        buttonXPath, 
+                        document, 
+                        null, 
+                        XPathResult.FIRST_ORDERED_NODE_TYPE, 
+                        null
+                    ).singleNodeValue;
+
+                    console.debug('[CONTENT] XPath search result:', !!button);
+
+                    return {
+                        found: !!button,
+                        buttonText: button ? button.textContent : null,
+                        buttonAttributes: button ? {
+                            href: button.getAttribute('href'),
+                            className: button.className,
+                            id: button.id
+                        } : null
+                    };
+                })();
+            `
+        });
+
+        if (result && result[0]) {
+            const buttonInfo = result[0];
+            if (buttonInfo.found) {
+                console.log('[DEBUG] Button FOUND! Details:', {
+                    text: buttonInfo.buttonText,
+                    href: buttonInfo.buttonAttributes?.href,
+                    className: buttonInfo.buttonAttributes?.className,
+                    id: buttonInfo.buttonAttributes?.id
+                });
+            } else {
+                console.warn('[DEBUG] Button NOT found. Continuing search...');
+            }
+        } else {
+            console.warn('[DEBUG] No result returned from button search');
+        }
+    } catch (error) {
+        console.error('[DEBUG] Error in button search:', error);
+    }
+}
+
+// Start periodic button search
+let buttonSearchInterval: number | undefined;
+
+function startButtonSearch() {
+    console.debug('[DEBUG] Attempting to start button search');
+    if (!buttonSearchInterval) {
+        console.log('[DEBUG] Starting periodic button search every 2 seconds');
+        buttonSearchInterval = window.setInterval(() => {
+            console.debug('[DEBUG] Periodic button search tick');
+            searchForButton();
+        }, 2000);
+        console.log(`[DEBUG] Button search interval started with ID: ${buttonSearchInterval}`);
+    } else {
+        console.warn('[DEBUG] Button search already running');
+    }
+}
+
+function stopButtonSearch() {
+    console.debug('[DEBUG] Attempting to stop button search');
+    if (buttonSearchInterval) {
+        console.log(`[DEBUG] Stopping button search, interval ID: ${buttonSearchInterval}`);
+        window.clearInterval(buttonSearchInterval);
+        buttonSearchInterval = undefined;
+        console.log('[DEBUG] Button search stopped');
+    } else {
+        console.warn('[DEBUG] No active button search to stop');
+    }
+}
+
+// Enhance existing message listener with debug logging
+browser.runtime.onMessage.addListener(async (message: MessageType) => {
+    console.debug('[DEBUG] Received runtime message:', message);
+
+    if (message.action === 'toggleAutoPress') {
+        console.debug('[DEBUG] Toggle auto press received');
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        const tab = tabs[0];
+
+        if (!tab || !tab.id) {
+            console.error('[DEBUG] No active tab found for auto press');
+            return;
+        }
+
+        if (message.value) {
+            console.log('[DEBUG] Starting auto press');
+            await startAutoPress(tab.id);
+        } else {
+            console.log('[DEBUG] Stopping auto press');
+            stopAutoPress();
+        }
+    }
+
+    // Enhanced button search toggle
+    if (message.action === 'toggleButtonSearch') {
+        console.debug('[DEBUG] Toggle button search received');
+        if (message.value) {
+            console.log('[DEBUG] Enabling button search');
+            startButtonSearch();
+        } else {
+            console.log('[DEBUG] Disabling button search');
+            stopButtonSearch();
+        }
+    }
+});
+
+// Start button search when extension is loaded with debug info
+console.debug('[DEBUG] Extension background script initializing');
+startButtonSearch();
+console.debug('[DEBUG] Extension background script initialization complete');
+
 // При установке или обновлении расширения
 browser.runtime.onInstalled.addListener(() => {
     console.log('Extension installed/updated');
+    console.debug('[DEBUG] Extension installed/updated');
     // Сбрасываем состояние автонажатия при установке
     localStorage.removeItem('autoKeyEnabled');
 });
@@ -155,6 +293,7 @@ browser.runtime.onInstalled.addListener(() => {
 // Слушаем изменения активной вкладки
 browser.tabs.onActivated.addListener(async (activeInfo) => {
     console.log('Tab activated:', activeInfo.tabId);
+    console.debug('[DEBUG] Tab activated:', activeInfo.tabId);
     // Останавливаем предыдущий интервал
     stopAutoPress();
     // Запускаем новый интервал для активной вкладки
@@ -165,30 +304,10 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.active) {
         console.log('Active tab updated:', tabId);
+        console.debug('[DEBUG] Active tab updated:', tabId);
         // Останавливаем предыдущий интервал
         stopAutoPress();
         // Запускаем новый интервал для обновленной вкладки
         await startAutoPress(tabId);
-    }
-});
-
-// Обработчик сообщений
-browser.runtime.onMessage.addListener(async (message: MessageType) => {
-    console.log('Received message:', message);
-
-    if (message.action === 'toggleAutoPress') {
-        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-        const tab = tabs[0];
-
-        if (!tab || !tab.id) {
-            console.error('No active tab found');
-            return;
-        }
-
-        if (message.value) {
-            await startAutoPress(tab.id);
-        } else {
-            stopAutoPress();
-        }
     }
 });

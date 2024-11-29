@@ -30,7 +30,7 @@ export const KEY_CONFIG = {
 
 // Типы сообщений
 export type MessageType = {
-    action: 'toggleAutoPress';
+    action: 'toggleAutoPress' | 'toggleButtonSearch';
     value?: boolean;
     type?: string;
     data?: any;
