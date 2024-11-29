@@ -14,6 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // Восстанавливаем состояние чекбокса из localStorage
+    const savedState = localStorage.getItem('autoKeyEnabled');
+    if (savedState !== null) {
+        autoKeyCheckbox.checked = savedState === 'true';
+    }
+
     // Обновляем текст метки
     const sequence = KEY_CONFIG.KEY_SEQUENCE.map(key => key.toUpperCase()).join(' + ');
     keyLabel.textContent = `Auto Press '${sequence}'`;
@@ -26,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Функция для включения/выключения автонажатия клавиш
     async function toggleAutoPress(enabled: boolean) {
         console.log('Toggling auto press:', enabled);
+        localStorage.setItem('autoKeyEnabled', String(enabled)); // Сохраняем состояние в localStorage
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });
         if (tabs[0] && tabs[0].id) {
             await browser.runtime.sendMessage({
