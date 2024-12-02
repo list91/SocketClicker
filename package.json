@@ -1,7 +1,7 @@
 {
-  "name": "my-chrome-extension",
+  "name": "socket-clicker",
   "version": "1.0.0",
-  "description": "My first Chrome extension",
+  "description": "Browser automation extension",
   "repository": "https://github.com/getvictor/create-chrome-extension",
   "author": "getvictor",
   "license": "MIT",
