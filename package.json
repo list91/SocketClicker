@@ -6,19 +6,24 @@
   "author": "getvictor",
   "license": "MIT",
   "scripts": {
-    "start": "webpack --watch --config webpack.dev.ts",
+    "start": "webpack --watch --config webpack.prod.ts",
     "build": "webpack --config webpack.prod.ts",
     "build:single": "webpack --config webpack.single.ts",
-    "build:tsc": "tsc --project tsconfig.single.json && node scripts/build-single.js"
+    "build:tsc": "tsc --project tsconfig.single.json && node scripts/build-single.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.6",
     "@types/chrome": "^0.0.268",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.9.0",
     "copy-webpack-plugin": "^12.0.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
+    "typescript": "^5.7.2",
     "webpack": "^5.91.0",
     "webpack-cli": "^5.1.4",
     "webpack-merge": "^5.10.0"

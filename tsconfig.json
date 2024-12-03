@@ -12,7 +12,8 @@
     "rootDir": "./src",
     "sourceMap": true,
     "declaration": true,
-    "types": ["chrome", "node"],
+    "types": ["jest", "node", "chrome"],
+    "typeRoots": ["./node_modules/@types", "./types"],
     "lib": ["ES2020", "DOM"],
     "noImplicitAny": false
   },
