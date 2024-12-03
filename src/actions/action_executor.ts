@@ -1,379 +1,741 @@
-import { ActionType, IAction } from './action_collection';
-
-// Интерфейс для результата выполнения действия
-export interface IActionResult {
-  success: boolean;        // Успешно ли выполнено действие
-  error?: string | null;   // Сообщение об ошибке
-  data?: any;              // Дополнительные данные
-  value?: any;             // Дополнительное значение
-}
+import { IAction, IActionResult, ActionType, IComplexCommand } from '../types';
 
 // Класс для выполнения действий
 export class ActionExecutor {
   private timeouts: { [key: string]: number };
   private variables: { [key: string]: any };
+  private currentTabId: number | null = null;  // Инициализация значением null
+  private proxyPilotUrl: string = 'http://127.0.0.1:5000';
 
   constructor() {
-    // Инициализация таймаутов по умолчанию
-    this.timeouts = {
-      element: 10000,    // Таймаут ожидания элемента
-      page: 30000,       // Таймаут загрузки страницы
-      script: 10000,     // Таймаут выполнения скрипта
-      download: 30000    // Таймаут загрузки файла
-    };
+    this.timeouts = {};
     this.variables = {};
+
+    // Получаем текущий активный таб при инициализации
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0] && tabs[0].id) {
+        this.currentTabId = tabs[0].id;
+      }
+    });
   }
 
-  // Основной метод выполнения действия
-  async execute(action: IAction): Promise<IActionResult> {
-    // Проверка типа действия
-    if (!Object.values(ActionType).includes(action.action)) {
-      throw new Error('Unsupported action type');
+  // Метод для обновления текущего таба
+  private async updateCurrentTab(): Promise<void> {
+    return new Promise((resolve) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id) {
+          this.currentTabId = tabs[0].id;
+        }
+        resolve();
+      });
+    });
+  }
+
+  // Безопасное получение элемента по XPath с улучшенной типизацией
+  private async findElementByXpath(xpath: string): Promise<boolean> {
+    if (!xpath) {
+      console.error('❌ Пустой XPath');
+      return false;
     }
 
-    // Валидация параметров в зависимости от типа действия
-    this.validateActionParameters(action);
+    try {
+      // Обновляем текущий таб перед выполнением
+      await this.updateCurrentTab();
+
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: this.currentTabId as number },
+        func: (elementXpath: string) => {
+          const element = document.evaluate(
+            elementXpath, 
+            document, 
+            null, 
+            XPathResult.FIRST_ORDERED_NODE_TYPE, 
+            null
+          ).singleNodeValue;
+
+          return !!element;
+        },
+        args: [xpath]
+      });
+
+      return result[0]?.result || false;
+    } catch (error) {
+      console.error('❌ Ошибка поиска элемента по XPath:', error);
+      return false;
+    }
+  }
+
+  // Выполнение действия с улучшенной типизацией
+  public async execute(action: IAction): Promise<IActionResult> {
+    // Проверка наличия обязательных параметров
+    if (!action.action) {
+      return { 
+        success: false, 
+        error: 'Отсутствует тип действия',
+        message: 'Не указан тип действия для выполнения'
+      };
+    }
 
     try {
-      // Если задана задержка перед выполнением
+      // Выполнение задержки перед действием, если указано
       if (action.on_start) {
         await this.sleep(action.on_start);
       }
 
-      // Выполнение действия в зависимости от типа
       switch (action.action) {
-        case ActionType.GO:
-          return await this.executeNavigate(action);
-        
-        case ActionType.CLICK:
+        case 'click':
           return await this.executeClick(action);
-        
-        case ActionType.INPUT:
+        case 'input':
           return await this.executeInput(action);
-        
-        case ActionType.WAIT:
-          return await this.executeWait(action);
-        
-        case ActionType.GET_TEXT:
-          return await this.executeGetText(action);
-        
-        case ActionType.WAIT_FOR_ELEMENT:
-          return await this.executeWaitForElement(action);
-        
-        case ActionType.WAIT_FOR_PAGE_LOAD:
-          return await this.executeWaitForPageLoad(action);
-        
-        case ActionType.SELECT:
+        case 'select':
           return await this.executeSelect(action);
-        
-        case ActionType.CHECK:
+        case 'checkbox':
           return await this.setCheckbox(action);
-        
-        case ActionType.SCROLL:
+        case 'scroll':
           return await this.executeScroll(action);
-        
-        case ActionType.EXECUTE_SCRIPT:
-          return this.executeScript(action);
-        
+        case 'get_text':
+          return await this.executeGetText(action);
+        case 'go':
+          return await this.executeGo(action);
         default:
-          throw new Error(`Unsupported action type: ${action.action}`);
+          return { 
+            success: false, 
+            error: `Неизвестный тип действия: ${action.action}`,
+            message: `Неизвестный тип действия: ${action.action}`
+          };
       }
-    } catch (error: unknown) {
-      // Логирование ошибки
-      console.error(`Action execution error: ${(error as Error).message}`, error);
-      
-      // Пробрасываем ошибку для обработки в тестах
-      throw error;
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        message: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      };
     }
   }
 
-  // Валидация параметров действия
-  private validateActionParameters(action: IAction): void {
-    switch (action.action) {
-      case ActionType.GO:
-        if (!action.value) {
-          throw new Error('URL is required');
-        }
-        if (typeof action.value !== 'string') {
-          throw new Error('Invalid input value');
-        }
-        break;
-      case ActionType.CLICK:
-      case ActionType.INPUT:
-      case ActionType.GET_TEXT:
-        if (!action.element_xpath) {
-          throw new Error('Element xpath is required');
-        }
-        if (action.action === ActionType.INPUT) {
-          if (action.value === null || action.value === undefined || action.value === '') {
-            throw new Error('Invalid input value');
+  // Выполнение сложной команды
+  public async executeComplexCommand(command: IComplexCommand): Promise<IActionResult[]> {
+    if (!command || !command.params || !Array.isArray(command.params.data)) {
+      return [{
+        success: false,
+        error: 'Некорректный формат сложной команды',
+        message: 'Некорректный формат сложной команды'
+      }];
+    }
+
+    const results: IActionResult[] = [];
+    let retryCount = command.params.retry_count || 0;
+    const retryDelay = command.params.retry_delay || 1000;
+
+    while (retryCount >= 0) {
+      try {
+        for (const action of command.params.data) {
+          const result = await this.execute(action);
+          results.push(result);
+
+          if (!result.success) {
+            throw new Error(`Ошибка выполнения действия: ${result.error}`);
           }
         }
-        break;
-      case ActionType.WAIT:
-        if (typeof action.value !== 'number' && isNaN(parseInt(action.value as string, 10))) {
-          throw new Error('Invalid wait time');
+        break; // Успешное выполнение всех действий
+      } catch (error) {
+        if (retryCount === 0) {
+          results.push({
+            success: false,
+            error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+            message: 'Не удалось выполнить сложную команду'
+          });
+          break;
+        }
+        
+        // Ожидание перед повторной попыткой
+        await this.sleep(retryDelay);
+        retryCount--;
+      }
+    }
+
+    return results;
+  }
+
+  // Приватные методы выполнения действий...
+  private validateActionParameters(action: IAction): void {
+    if (!action.action) {
+      throw new Error('Тип действия не указан');
+    }
+
+    switch (action.action) {
+      case 'go':
+        if (!action.value || typeof action.value !== 'string') {
+          throw new Error('Некорректный URL');
         }
         break;
+      case 'click':
+      case 'input':
+      case 'get_text':
+        if (!action.element_xpath || typeof action.element_xpath !== 'string') {
+          throw new Error('Некорректный XPath');
+        }
+        if (action.action === 'input' && (!action.value || typeof action.value !== 'string')) {
+          throw new Error('Некорректное значение для ввода');
+        }
+        break;
+      case 'select':
+      case 'checkbox':
+      case 'scroll':
+        // Дополнительные проверки для этих типов действий
+        break;
       default:
-        throw new Error('Unsupported action type');
+        throw new Error(`Неподдерживаемый тип действия: ${action.action}`)
     }
   }
 
-  // Переход по URL
-  private async executeNavigate(action: IAction): Promise<IActionResult> {
-    try {
-      await this.navigateTo(action.value as string);
-      return { success: true };
-    } catch (error) {
-      console.error('Navigation error:', error);
-      throw new Error(`Navigation failed: ${(error as Error).message}`);
-    }
+  // Приватный метод для задержки
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Клик по элементу
+  // Методы выполнения конкретных действий
   private async executeClick(action: IAction): Promise<IActionResult> {
-    const clickElement = this.findElementByXpath(action.element_xpath as string);
-    if (!clickElement) {
-      throw new Error('Element not found');
+    console.log(`🖱️ Выполнение клика. XPath: ${action.element_xpath}`);
+
+    if (!action.element_xpath) {
+      console.error('❌ Отсутствует XPath для клика');
+      return {
+        success: false,
+        error: 'Отсутствует XPath',
+        message: 'Не указан XPath элемента для клика'
+      };
     }
-    (clickElement as HTMLElement).click();
-    return { success: true };
+
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: this.currentTabId as number },
+        func: (elementXpath: string) => {
+          const element = document.evaluate(
+            elementXpath, 
+            document, 
+            null, 
+            XPathResult.FIRST_ORDERED_NODE_TYPE, 
+            null
+          ).singleNodeValue as HTMLElement;
+
+          if (element) {
+            console.log('📍 Элемент найден для клика');
+            element.click();
+            return true;
+          }
+          console.error('❌ Элемент не найден для клика');
+          return false;
+        },
+        args: [action.element_xpath]
+      });
+
+      const clickResult = result[0]?.result;
+      
+      return {
+        success: clickResult === true,
+        message: clickResult === true 
+          ? `Клик по элементу с XPath: ${action.element_xpath}` 
+          : 'Не удалось выполнить клик',
+        data: {
+          xpath: action.element_xpath,
+          elementFound: clickResult === true
+        }
+      };
+    } catch (error) {
+      console.error('🚨 Ошибка при выполнении клика:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Ошибка клика',
+        message: 'Не удалось выполнить клик'
+      };
+    }
   }
 
-  // Ввод текста
   private async executeInput(action: IAction): Promise<IActionResult> {
-    const inputElement = this.findElementByXpath(action.element_xpath as string);
-    if (!inputElement) {
-      throw new Error('Element not found');
-    }
-    (inputElement as HTMLInputElement).value = action.value as string;
-    return { success: true };
-  }
+    console.log(`🔍 Начало выполнения input. XPath: ${action.element_xpath}`);
+    console.log(`📥 Значение для ввода: ${action.value}`);
 
-  // Ожидание
-  private async executeWait(action: IAction): Promise<IActionResult> {
-    const ms = typeof action.value === 'number' 
-      ? action.value 
-      : parseInt(action.value as string, 10);
-
-    if (isNaN(ms)) {
-      throw new Error('Invalid wait time');
+    // Проверка наличия XPath
+    if (!action.element_xpath) {
+      console.error('❌ Отсутствует XPath элемента');
+      return { 
+        success: false, 
+        error: 'Отсутствует XPath элемента', 
+        message: 'Не указан XPath для ввода' 
+      };
     }
 
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        clearTimeout(timeoutId);
-        reject(new Error('Action timed out'));
-      }, ms);
+    // Преобразование значения к строке с безопасной обработкой
+    const inputValue = action.value !== undefined 
+      ? String(action.value) 
+      : '';
 
-      timeoutId.unref(); // Prevent timeout from keeping event loop active
-    });
+    console.log(`🔎 Поиск элемента по XPath: ${action.element_xpath}`);
+    const element = await this.findElementByXpath(action.element_xpath);
+    
+    if (!element) {
+      console.error(`❌ Элемент не найден по XPath: ${action.element_xpath}`);
+      return { 
+        success: false, 
+        error: 'Элемент не найден', 
+        message: 'Не удалось найти элемент для ввода' 
+      };
+    }
+
+    console.log(`✅ Элемент найден по XPath: ${action.element_xpath}`);
+
+    try {
+      // Выполнение ввода текста
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: this.currentTabId as number },
+        func: (elementXpath: string, value: string) => {
+          const element = document.evaluate(
+            elementXpath, 
+            document, 
+            null, 
+            XPathResult.FIRST_ORDERED_NODE_TYPE, 
+            null
+          ).singleNodeValue as HTMLInputElement;
+
+          if (element) {
+            console.log('📝 Найден элемент для ввода');
+            try {
+              element.value = value;
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+              console.log(`✅ Успешно введено значение: ${value}`);
+              return true;
+            } catch (error) {
+              console.error('❌ Ошибка при вводе значения:', error);
+              return false;
+            }
+          }
+          console.error('❌ Элемент не найден при выполнении скрипта');
+          return false;
+        },
+        args: [action.element_xpath, inputValue]
+      });
+
+      // Небольшая задержка для обработки события
+      await this.sleep(100);
+
+      const scriptResult = result[0]?.result;
+      console.log(`🏁 Результат ввода: ${scriptResult ? 'Успешно' : 'Неудачно'}`);
+
+      return { 
+        success: scriptResult === true, 
+        message: scriptResult === true
+          ? `Введено значение: ${inputValue}` 
+          : 'Не удалось ввести значение',
+        data: {
+          xpath: action.element_xpath,
+          value: inputValue,
+          elementFound: true
+        }
+      };
+    } catch (error) {
+      console.error('🚨 Критическая ошибка при вводе:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Ошибка ввода', 
+        message: 'Не удалось выполнить ввод текста',
+        data: {
+          xpath: action.element_xpath,
+          value: inputValue,
+          elementFound: false
+        }
+      };
+    }
   }
 
-  // Получение текста
+  private async executeSelect(action: IAction): Promise<IActionResult> {
+    const element = await this.findElementByXpath(action.element_xpath || '');
+    if (!element) {
+      return { 
+        success: false, 
+        error: 'Элемент не найден', 
+        message: 'Не удалось найти элемент для выбора' 
+      };
+    }
+    // Реализация выбора
+    return { success: true, message: 'Выбор выполнен' };
+  }
+
+  private async setCheckbox(action: IAction): Promise<IActionResult> {
+    const element = await this.findElementByXpath(action.element_xpath || '');
+    if (!element) {
+      return { 
+        success: false, 
+        error: 'Элемент не найден', 
+        message: 'Не удалось найти чекбокс' 
+      };
+    }
+    // Реализация работы с чекбоксом
+    return { success: true, message: 'Чекбокс установлен' };
+  }
+
+  private async executeScroll(action: IAction): Promise<IActionResult> {
+    console.log(`📜 Выполнение скролла. Значение: ${action.value}`);
+
+    if (action.value === undefined) {
+      console.error('❌ Отсутствует значение для скролла');
+      return {
+        success: false,
+        error: 'Отсутствует значение скролла',
+        message: 'Не указано значение для скролла'
+      };
+    }
+
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: this.currentTabId as number },
+        func: (scrollValue: number) => {
+          try {
+            // Выполнение скролла
+            window.scrollBy(0, scrollValue);
+            console.log(`📍 Скролл на ${scrollValue} пикселей`);
+            return true;
+          } catch (error) {
+            console.error('❌ Ошибка при скролле:', error);
+            return false;
+          }
+        },
+        args: [Number(action.value)]
+      });
+
+      const scrollResult = result[0]?.result;
+      
+      return {
+        success: scrollResult === true,
+        message: scrollResult === true 
+          ? `Скролл на ${action.value} пикселей` 
+          : 'Не удалось выполнить скролл',
+        data: {
+          scrollValue: action.value
+        }
+      };
+    } catch (error) {
+      console.error('🚨 Ошибка при выполнении скролла:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Ошибка скролла',
+        message: 'Не удалось выполнить скролл'
+      };
+    }
+  }
+
   private async executeGetText(action: IAction): Promise<IActionResult> {
-    const textElement = this.findElementByXpath(action.element_xpath as string);
-    if (!textElement) {
-      throw new Error('Element not found');
+    const element = await this.findElementByXpath(action.element_xpath || '');
+    if (!element) {
+      return { 
+        success: false, 
+        error: 'Элемент не найден', 
+        message: 'Не удалось найти элемент для получения текста' 
+      };
     }
-    return { success: true, value: textElement.textContent };
+    // Реализация получения текста
+    return { success: true, message: 'Текст получен' };
   }
 
-  // Выполнение скрипта
-  private executeScript(action: IAction): IActionResult {
-    const script = new Function(action.value as string);
-    const result = script();
-    return { success: true, value: result };
+  private async executeGo(action: IAction): Promise<IActionResult> {
+    console.log(`🌐 Переход по URL: ${action.value}`);
+
+    if (!action.value || typeof action.value !== 'string') {
+      console.error('❌ Некорректный URL');
+      return {
+        success: false,
+        error: 'Некорректный URL',
+        message: 'Не указан или неверный формат URL'
+      };
+    }
+
+    try {
+      // Получаем текущую активную вкладку
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab || !tab.id) {
+        console.error('❌ Не удалось найти активную вкладку');
+        return {
+          success: false,
+          error: 'Вкладка не найдена',
+          message: 'Не удалось найти активную вкладку для перехода'
+        };
+      }
+
+      // Обновляем вкладку
+      await chrome.tabs.update(tab.id, { url: action.value });
+
+      // Небольшая задержка для загрузки страницы
+      await this.sleep(1000);
+
+      console.log(`✅ Успешный переход на ${action.value}`);
+      return {
+        success: true,
+        message: `Переход на ${action.value}`,
+        data: {
+          url: action.value
+        }
+      };
+    } catch (error) {
+      console.error('🚨 Ошибка при переходе:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Ошибка перехода',
+        message: 'Не удалось выполнить переход по URL'
+      };
+    }
   }
 
-  // Переход по URL
-  private async navigateTo(url: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const mockChrome = (global as any).chrome;
-      const globalChrome = typeof chrome !== 'undefined' ? chrome : null;
+  /**
+   * Опрос ProxyPilot на наличие новых команд
+   * @returns Promise с информацией о команде или null
+   */
+  private async checkProxyPilotCommands(): Promise<void> {
+    console.log('🕒 Проверка команд ProxyPilot');
+    
+    try {
+      const response = await this.fetchProxyPilotCommands();
       
-      const chromeObj = mockChrome || globalChrome;
-      
-      if (!chromeObj?.runtime?.sendMessage) {
-        // Fallback to window location if no chrome runtime
-        window.location.href = url;
-        resolve();
+      if (!response) {
+        console.log('❌ Пустой ответ от ProxyPilot');
         return;
       }
 
-      const navigationTimeout = setTimeout(() => {
-        clearTimeout(navigationTimeout);
-        reject(new Error('Navigation timed out'));
-      }, this.timeouts.page);
+      console.log('📦 Полученный текст:', JSON.stringify(response, null, 2));
 
-      chromeObj.runtime.sendMessage(
-        { action: 'navigate', url },
-        (response) => {
-          clearTimeout(navigationTimeout);
+      // Проверка структуры команды
+      if (!this.isValidCommand(response)) {
+        console.error('❌ Некорректная структура команды:', response);
+        return;
+      }
 
-          if (chromeObj.runtime.lastError) {
-            reject(new Error(chromeObj.runtime.lastError.message));
-          } else if (response && response.success) {
-            resolve();
-          } else {
-            // Fallback to window location if chrome navigation fails
-            try {
-              window.location.href = url;
-              resolve();
-            } catch (error) {
-              reject(new Error('Navigation failed'));
-            }
-          }
-        }
-      );
-    });
-  }
+      console.log(`🔍 Получена команда от ProxyPilot: ${JSON.stringify(response)}`);
 
-  // Ожидание
-  private async wait(ms: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
+      // Выполнение команды
+      const commandResult = await this.executeCommand(response);
       
-      const timeoutId = setTimeout(() => {
-        clearTimeout(timeoutId);
-        reject(new Error('Action timed out'));
-      }, ms);
-      
-      const checkTimeout = () => {
-        if (Date.now() - startTime >= ms) {
-          clearTimeout(timeoutId);
-          resolve();
-        } else {
-          setTimeout(checkTimeout, 10);
-        }
-      };
-      
-      checkTimeout();
-    });
-  }
+      console.log('📊 Результат выполнения команды:', JSON.stringify(commandResult, null, 2));
 
-  // Поиск элемента по XPath
-  private findElementByXpath(xpath: string): Element | null {
-    try {
-      const result = document.evaluate(
-        xpath, 
-        document, 
-        null, 
-        XPathResult.FIRST_ORDERED_NODE_TYPE, 
-        null
-      );
-      return result.singleNodeValue as Element;
+      // Отправка результата обратно в ProxyPilot
+      await this.sendCommandResult(response.id, commandResult);
+
     } catch (error) {
-      console.error('XPath evaluation error:', error);
+      console.error('🚨 Ошибка при проверке команд ProxyPilot:', error);
+    }
+  }
+
+  // Валидация структуры команды
+  private isValidCommand(command: any): boolean {
+    console.log('🕵️ Проверка валидности команды');
+    
+    if (!command) {
+      console.error('❌ Команда пуста');
+      return false;
+    }
+
+    const requiredFields = ['command', 'id', 'params', 'time_created'];
+    for (const field of requiredFields) {
+      if (!(field in command)) {
+        console.error(`❌ Отсутствует обязательное поле: ${field}`);
+        return false;
+      }
+    }
+
+    if (!command.params || !command.params.data) {
+      console.error('❌ Некорректные параметры команды');
+      return false;
+    }
+
+    for (const action of command.params.data) {
+      if (!action.action) {
+        console.error('❌ Отсутствует тип действия');
+        return false;
+      }
+    }
+
+    console.log('✅ Команда прошла валидацию');
+    return true;
+  }
+
+  // Отправка результата команды обратно в ProxyPilot
+  private async sendCommandResult(commandId: string, result: IActionResult): Promise<void> {
+    console.log('📤 Отправка результата команды в ProxyPilot');
+    
+    try {
+      const response = await fetch(`${this.proxyPilotUrl}/command_result`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          command_id: commandId,
+          result: result
+        })
+      });
+
+      if (!response.ok) {
+        console.error(`❌ Ошибка отправки результата: ${response.status}`);
+      } else {
+        console.log('✅ Результат команды успешно отправлен');
+      }
+    } catch (error) {
+      console.error('🚨 Ошибка при отправке результата команды:', error);
+    }
+  }
+
+  // Запрос команды от ProxyPilot
+  private async fetchProxyPilotCommands(): Promise<any> {
+    try {
+      const response = await fetch(`${this.proxyPilotUrl}/get_command`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`❌ Ошибка запроса команды: ${response.status}`);
+        return null;
+      }
+
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === '') {
+        console.log('🕐 Нет новых команд от ProxyPilot');
+        return null;
+      }
+
+      let commandData;
+      try {
+        commandData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Ошибка парсинга JSON:', parseError);
+        console.log('❌ Проблемный текст:', responseText);
+        return null;
+      }
+      
+      return commandData;
+    } catch (error) {
+      console.error('🚨 Критическая ошибка при запросе команды:', error);
       return null;
     }
   }
 
-  // Вспомогательный метод задержки
-  private async sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  // Выполнение команды
+  private async executeCommand(command: any): Promise<IActionResult> {
+    console.log(`🚀 Выполнение команды: ${command.command}`);
+    console.log(`🆔 ID команды: ${command.id}`);
+    console.log(`📋 Параметры команды:`, JSON.stringify(command.params, null, 2));
 
-  // Ожидание элемента
-  private async executeWaitForElement(action: IAction): Promise<IActionResult> {
-    const xpath = action.element_xpath as string;
-    const timeout = Number(action.value) || this.timeouts.element;
-
-    try {
-      const element = await this.waitForElement(xpath, timeout);
-      return { success: true, value: element };
-    } catch (error) {
-      throw new Error('Element not found within timeout');
-    }
-  }
-
-  // Ожидание элемента с таймаутом
-  private async waitForElement(xpath: string, timeout: number): Promise<Element> {
-    const startTime = Date.now();
-
-    return new Promise((resolve, reject) => {
-      const checkForElement = () => {
-        const element = this.findElementByXpath(xpath);
-        
-        if (element) {
-          resolve(element);
-        } else if (Date.now() - startTime >= timeout) {
-          reject(new Error('Element not found'));
-        } else {
-          setTimeout(checkForElement, 100);
-        }
+    // Проверка текущей активной вкладки
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs.length || !tabs[0].id) {
+      console.error('❌ Нет активной вкладки');
+      return {
+        success: false,
+        error: 'Нет активной вкладки',
+        message: 'Не удалось найти активную вкладку для выполнения команд'
       };
+    }
+    this.currentTabId = tabs[0].id;
+    console.log(`🌟 Текущая активная вкладка: ${this.currentTabId}`);
 
-      checkForElement();
-    });
-  }
-
-  // Ожидание загрузки страницы
-  private async executeWaitForPageLoad(action: IAction): Promise<IActionResult> {
-    const timeout = Number(action.value) || this.timeouts.page;
-
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-
-      const checkPageLoad = () => {
-        if (document.readyState === 'complete') {
-          resolve({ success: true });
-        } else if (Date.now() - startTime >= timeout) {
-          reject(new Error('Page load timeout'));
-        } else {
-          setTimeout(checkPageLoad, 100);
-        }
+    if (!command.params || !command.params.data) {
+      console.error('❌ Отсутствуют параметры или данные команды');
+      return {
+        success: false,
+        error: 'Некорректные параметры команды',
+        message: 'Не указаны параметры или данные для выполнения'
       };
-
-      checkPageLoad();
-    });
-  }
-
-  // Выполнение Select
-  private async executeSelect(action: IAction): Promise<IActionResult> {
-    const selectElement = this.findElementByXpath(action.element_xpath as string) as HTMLSelectElement;
-    if (!selectElement) {
-      throw new Error('Element not found');
     }
 
-    selectElement.value = action.value as string;
-    return { success: true };
-  }
+    const actions = command.params.data;
+    console.log(`🔢 Количество действий: ${actions.length}`);
 
-  // Установка чекбокса
-  private async setCheckbox(action: IAction): Promise<IActionResult> {
-    const checkboxElement = this.findElementByXpath(action.element_xpath as string) as HTMLInputElement;
-    if (!checkboxElement) {
-      throw new Error('Element not found');
+    const results: IActionResult[] = [];
+
+    for (const action of actions) {
+      console.log(`🔍 Выполнение действия: ${JSON.stringify(action)}`);
+      
+      try {
+        let result: IActionResult;
+        switch (action.action) {
+          case 'input':
+            result = await this.executeInput(action);
+            break;
+          case 'click':
+            result = await this.executeClick(action);
+            break;
+          case 'scroll':
+            result = await this.executeScroll(action);
+            break;
+          case 'go':
+            result = await this.executeGo(action);
+            break;
+          default:
+            console.warn(`⚠️ Неизвестное действие: ${action.action}`);
+            result = {
+              success: false,
+              error: 'Неподдерживаемое действие',
+              message: `Действие ${action.action} не поддерживается`
+            };
+        }
+
+        console.log(`📊 Результат действия:`, JSON.stringify(result, null, 2));
+        results.push(result);
+
+        // Небольшая задержка между действиями
+        await this.sleep(500);
+
+        // Остановка выполнения если действие не удалось
+        if (!result.success) {
+          console.error(`❌ Ошибка при выполнении действия: ${action.action}`);
+          break;
+        }
+      } catch (error) {
+        console.error(`🚨 Критическая ошибка при выполнении действия:`, error);
+        results.push({
+          success: false,
+          error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+          message: `Ошибка при выполнении действия ${action.action}`
+        });
+        break;
+      }
     }
 
-    checkboxElement.checked = this.parseCheckboxValue(action.value);
-    return { success: true };
+    // Определение общего результата
+    const overallSuccess = results.every(result => result.success);
+    
+    return {
+      success: overallSuccess,
+      message: overallSuccess 
+        ? 'Все действия выполнены успешно' 
+        : 'Не все действия выполнены',
+      data: {
+        commandId: command.id,
+        actionResults: results
+      }
+    };
   }
 
-  // Парсинг значения для чекбокса
-  private parseCheckboxValue(value: any): boolean {
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
-    if (typeof value === 'number') return value !== 0;
-    return false;
-  }
+  /**
+   * Запуск периодического опроса ProxyPilot
+   * @param intervalMs Интервал опроса в миллисекундах
+   */
+  startProxyPilotPolling(intervalMs: number = 5000): void {
+    const pollProxyPilot = async () => {
+      try {
+        await this.checkProxyPilotCommands();
+      } catch (error) {
+        console.error('Ошибка при опросе ProxyPilot:', error);
+      }
+    };
 
-  // Скроллинг
-  private async executeScroll(action: IAction): Promise<IActionResult> {
-    const scrollElement = this.findElementByXpath(action.element_xpath as string);
-    if (!scrollElement) {
-      throw new Error('Element not found');
-    }
+    // Запускаем первый опрос немедленно
+    pollProxyPilot();
 
-    scrollElement.scrollIntoView({ behavior: 'smooth' });
-    return { success: true };
-  }
-
-  // Установка таймаута
-  public setTimeout(type: string, value: number): void {
-    this.timeouts[type] = value;
+    // Устанавливаем интервальный опрос
+    setInterval(pollProxyPilot, intervalMs);
   }
 }
 

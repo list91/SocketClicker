@@ -4,17 +4,13 @@
   "version": "1.0.0",
   "description": "Browser automation extension",
   "permissions": [
-    "tabs",
-    "activeTab",
+    "activeTab", 
+    "tabs", 
     "scripting",
-    "webNavigation",
-    "storage",
-    "debugger"
+    "storage"
   ],
   "host_permissions": [
-    "http://localhost:5000/*",
-    "https://*/*",
-    "http://*/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
