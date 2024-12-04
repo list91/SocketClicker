@@ -4,6 +4,7 @@ export enum ActionType {
   GO = 'go',                    // Переход по URL
   CLICK = 'click',             // Клик по элементу
   INPUT = 'input',             // Ввод текста
+  WRITE_KEYS = 'writeKeys',      // Ввод текста посимвольно с имитацией нажатия клавиш
   
   // Действия с окнами
   SWITCH_TAB = 'switchTab',    // Переключение вкладки

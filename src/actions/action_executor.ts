@@ -1,4 +1,5 @@
 import { IAction, IActionResult, ActionType, IComplexCommand } from '../types';
+import { WebInteractions } from './web_interactions';
 
 // Класс для выполнения действий
 export class ActionExecutor {
@@ -325,13 +326,13 @@ export class ActionExecutor {
 
       return { 
         success: scriptResult === true, 
-        message: scriptResult === true
+        message: scriptResult === true 
           ? `Введено значение: ${inputValue}` 
           : 'Не удалось ввести значение',
         data: {
           xpath: action.element_xpath,
           value: inputValue,
-          elementFound: true
+          elementFound: scriptResult === true
         }
       };
     } catch (error) {
@@ -483,6 +484,40 @@ export class ActionExecutor {
         success: false,
         error: error instanceof Error ? error.message : 'Ошибка перехода',
         message: 'Не удалось выполнить переход по URL'
+      };
+    }
+  }
+
+  // Выполнение действия startAutoPress
+  private async executeStartAutoPress(action: IAction): Promise<IActionResult> {
+    console.log(`⌨️ Выполнение посимвольного ввода текста: ${action.value}`);
+    
+    try {
+      // Обновляем текущий таб перед выполнением
+      await this.updateCurrentTab();
+      
+      if (!this.currentTabId) {
+        throw new Error('Не найдена активная вкладка');
+      }
+      
+      if (!action.value || !Array.isArray(action.value)) {
+        throw new Error('Некорректный текст для ввода');
+      }
+      const result = await WebInteractions.startAutoPress(this.currentTabId, action.value || []);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Ошибка при вводе текста');
+      }
+
+      return {
+        success: true,
+        message: 'Текст успешно введен'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        message: 'Ошибка при вводе текста'
       };
     }
   }
@@ -671,6 +706,9 @@ export class ActionExecutor {
             break;
           case 'go':
             result = await this.executeGo(action);
+            break;
+          case 'startAutoPress':
+            result = await this.executeStartAutoPress(action);
             break;
           default:
             console.warn(`⚠️ Неизвестное действие: ${action.action}`);
