@@ -493,17 +493,25 @@ export class ActionExecutor {
     console.log(`⌨️ Выполнение посимвольного ввода текста: ${action.value}`);
     
     try {
+      // const symbols = []
       // Обновляем текущий таб перед выполнением
+      
       await this.updateCurrentTab();
       
       if (!this.currentTabId) {
         throw new Error('Не найдена активная вкладка');
       }
       
-      if (!action.value || !Array.isArray(action.value)) {
+      if (!action.value) {
         throw new Error('Некорректный текст для ввода');
       }
-      const result = await WebInteractions.startAutoPress(this.currentTabId, action.value || []);
+      if (typeof action.value === 'string'){
+        const symbols = action.value.split('').map(s => s.toString());
+        console.log("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%",symbols)
+        const result = await WebInteractions.startAutoPress(this.currentTabId, symbols || []);
+      } else {
+        throw new Error('Некорректный текст для ввода');
+      }
       
       // if (!result.success) {
       //   throw new Error(result.message || 'Ошибка при вводе текста');
