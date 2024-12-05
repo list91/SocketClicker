@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "SocketClicker",
+  "version": "1.0.0",
+  "description": "Browser automation extension",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "host_permissions": [
+    "http://*/*", 
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "action": {
+    "default_title": "SocketClicker"
+  }
+}

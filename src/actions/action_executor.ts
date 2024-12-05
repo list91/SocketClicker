@@ -505,9 +505,9 @@ export class ActionExecutor {
       }
       const result = await WebInteractions.startAutoPress(this.currentTabId, action.value || []);
       
-      if (!result.success) {
-        throw new Error(result.message || 'Ошибка при вводе текста');
-      }
+      // if (!result.success) {
+      //   throw new Error(result.message || 'Ошибка при вводе текста');
+      // }
 
       return {
         success: true,

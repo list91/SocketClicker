@@ -1,4 +1,10 @@
 import ActionExecutor from './actions/action_executor';
+// import { chrome } from 'webextension-polyfill-ts';
+
+// Initialize storage with default value
+chrome.storage.local.set({ autoKeyEnabled: true }, () => {
+    console.log('Initialized autoKeyEnabled to true');
+});
 
 // Создаем единственный экземпляр ActionExecutor
 const actionExecutor = new ActionExecutor();
