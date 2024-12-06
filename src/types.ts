@@ -16,6 +16,7 @@ export interface IAction {
   element_xpath?: string;
   value?: string | number | boolean;
   selector?: string;
+  target?: string;  // Добавляем новое поле
   on_start?: number;
 }
 
@@ -25,6 +26,11 @@ export interface IActionResult {
   message?: string;
   error?: string;
   data?: any;
+  details?: {
+    elementText?: string;
+    elementTagName?: string;
+    [key: string]: any;
+  };
 }
 
 // Интерфейс для сложной команды

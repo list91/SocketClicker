@@ -197,60 +197,173 @@ export class ActionExecutor {
 
   // Методы выполнения конкретных действий
   private async executeClick(action: IAction): Promise<IActionResult> {
-    console.log(`🖱️ Выполнение клика. XPath: ${action.element_xpath}`);
-
-    if (!action.element_xpath) {
-      console.error('❌ Отсутствует XPath для клика');
-      return {
+    const result: IActionResult = {
         success: false,
-        error: 'Отсутствует XPath',
-        message: 'Не указан XPath элемента для клика'
-      };
+        message: 'Click not executed'
+    };
+
+    // Используем element_xpath или target, если они есть
+    const selector = action.element_xpath || action.target;
+    if (!selector) {
+        result.message = 'No selector or target provided for click';
+        return result;
     }
 
     try {
-      const result = await chrome.scripting.executeScript({
-        target: { tabId: this.currentTabId as number },
-        func: (elementXpath: string) => {
-          const element = document.evaluate(
-            elementXpath, 
-            document, 
-            null, 
-            XPathResult.FIRST_ORDERED_NODE_TYPE, 
-            null
-          ).singleNodeValue as HTMLElement;
+        const scriptResults = await chrome.scripting.executeScript({
+            target: { tabId: this.currentTabId as number },
+            func: (selector: string) => {
+                // Расширенный поиск элемента с несколькими стратегиями
+                const findElement = (selector: string): HTMLElement | null => {
+                    // Попытка найти по XPath
+                    const xpathResult = document.evaluate(
+                        selector, 
+                        document, 
+                        null, 
+                        XPathResult.FIRST_ORDERED_NODE_TYPE, 
+                        null
+                    ).singleNodeValue as HTMLElement;
 
-          if (element) {
-            console.log('📍 Элемент найден для клика');
-            element.click();
-            return true;
-          }
-          console.error('❌ Элемент не найден для клика');
-          return false;
-        },
-        args: [action.element_xpath]
-      });
+                    if (xpathResult) return xpathResult;
 
-      const clickResult = result[0]?.result;
-      
-      return {
-        success: clickResult === true,
-        message: clickResult === true 
-          ? `Клик по элементу с XPath: ${action.element_xpath}` 
-          : 'Не удалось выполнить клик',
-        data: {
-          xpath: action.element_xpath,
-          elementFound: clickResult === true
+                    // Попытка найти по CSS селектору
+                    const cssElement = document.querySelector(selector);
+                    if (cssElement instanceof HTMLElement) return cssElement;
+
+                    // Попытка найти по тексту
+                    const elementByText = Array.from(document.querySelectorAll('*'))
+                        .find(el => el.textContent?.trim() === selector) as HTMLElement;
+                    
+                    return elementByText || null;
+                };
+
+                const element = findElement(selector);
+
+                if (!element) {
+                    return { 
+                        found: false, 
+                        message: `Element not found: ${selector}`,
+                        searchStrategies: ['XPath', 'CSS Selector', 'Text Match']
+                    };
+                }
+
+                // Расширенная проверка видимости с диагностикой
+                const checkVisibility = (el: HTMLElement) => {
+                    const style = window.getComputedStyle(el);
+                    const rect = el.getBoundingClientRect();
+
+                    return {
+                        isVisible: 
+                            style.display !== 'none' &&
+                            style.visibility !== 'hidden' &&
+                            rect.top >= 0 &&
+                            rect.left >= 0 &&
+                            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                            rect.right <= (window.innerWidth || document.documentElement.clientWidth),
+                        opacity: parseFloat(style.opacity),
+                        displayStyle: style.display,
+                        visibilityStyle: style.visibility,
+                        boundingRect: {
+                            top: rect.top,
+                            left: rect.left,
+                            bottom: rect.bottom,
+                            right: rect.right,
+                            width: rect.width,
+                            height: rect.height
+                        }
+                    };
+                };
+
+                const visibilityInfo = checkVisibility(element);
+
+                // Улучшенный скроллинг с опциональным поведением
+                if (!visibilityInfo.isVisible) {
+                    try {
+                        element.scrollIntoView({ 
+                            block: 'center', 
+                            behavior: 'smooth',
+                            inline: 'nearest'
+                        });
+                    } catch (scrollError) {
+                        console.warn('Scroll failed', scrollError);
+                    }
+                }
+
+                // Расширенная диспетчеризация событий
+                const dispatchClickEvents = (target: HTMLElement) => {
+                    const events = [
+                        new MouseEvent('mouseover', { bubbles: true, cancelable: true }),
+                        new MouseEvent('mouseenter', { bubbles: false, cancelable: true }),
+                        new MouseEvent('mousemove', { bubbles: true, cancelable: true }),
+                        new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+                        new MouseEvent('click', { bubbles: true, cancelable: true }),
+                        new MouseEvent('mouseup', { bubbles: true, cancelable: true })
+                    ];
+
+                    events.forEach(event => target.dispatchEvent(event));
+
+                    // Специальная логика для инпутов
+                    if (target instanceof HTMLInputElement || 
+                        target instanceof HTMLTextAreaElement || 
+                        target.isContentEditable) {
+                        target.focus();  // Устанавливаем фокус
+                        
+                        // Создаем события фокуса
+                        const focusEvents = [
+                            new FocusEvent('focus', { bubbles: true, cancelable: true }),
+                            new Event('focusin', { bubbles: true, cancelable: true }),
+                            new Event('select', { bubbles: true, cancelable: true })
+                        ];
+
+                        focusEvents.forEach(event => target.dispatchEvent(event));
+
+                        // Имитируем мигание курсора
+                        target.style.caretColor = 'black';
+                        setTimeout(() => {
+                            target.style.caretColor = 'transparent';
+                            setTimeout(() => {
+                                target.style.caretColor = 'black';
+                            }, 500);
+                        }, 500);
+                    }
+                };
+
+                dispatchClickEvents(element);
+
+                return { 
+                    found: true, 
+                    elementText: element.textContent?.trim() || '',
+                    elementTagName: element.tagName,
+                    visibilityDetails: visibilityInfo,
+                    attributes: Array.from(element.attributes).map(attr => ({
+                        name: attr.name,
+                        value: attr.value
+                    }))
+                };
+            },
+            args: [selector]
+        });
+
+        const clickResult = scriptResults[0]?.result;
+
+        if (clickResult?.found) {
+            result.success = true;
+            result.message = 'Click successful';
+            result.details = {
+                elementText: clickResult.elementText,
+                elementTagName: clickResult.elementTagName,
+                visibilityDetails: clickResult.visibilityDetails,
+                attributes: clickResult.attributes
+            };
+        } else {
+            result.message = clickResult?.message || 'Element not found';
         }
-      };
     } catch (error) {
-      console.error('🚨 Ошибка при выполнении клика:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Ошибка клика',
-        message: 'Не удалось выполнить клик'
-      };
+        result.message = `Click execution error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        result.error = error instanceof Error ? error.toString() : 'Unknown error';
     }
+
+    return result;
   }
 
   private async executeInput(action: IAction): Promise<IActionResult> {
@@ -322,8 +435,7 @@ export class ActionExecutor {
       await this.sleep(100);
 
       const scriptResult = result[0]?.result;
-      console.log(`🏁 Результат ввода: ${scriptResult ? 'Успешно' : 'Неудачно'}`);
-
+      
       return { 
         success: scriptResult === true, 
         message: scriptResult === true 
