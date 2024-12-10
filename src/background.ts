@@ -1,21 +1,56 @@
-import ActionExecutor from './actions/action_executor';
-// import { chrome } from 'webextension-polyfill-ts';
+// Функция для получения текущей вкладки
+async function getCurrentTabId(): Promise<number> {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tabs.length === 0) {
+      throw new Error('Нет активных вкладок');
+  }
+  return tabs[0].id!;
+}
 
-// Initialize storage with default value
-chrome.storage.local.set({ autoKeyEnabled: true }, () => {
-    console.log('Initialized autoKeyEnabled to true');
-});
+// Функция для выполнения действий
+async function executeActions(actions: any[]) {
+    for (const action of actions) {
+        try {
+            if (action.func) {
+                console.log(`Выполнение кода: ${action.func}`); // Выводим код перед выполнением
+                const result = await chrome.scripting.executeScript({
+                    target: { tabId: await getCurrentTabId() },
+                    func: (message) => alert(message), // Выполнение alert в контексте страницы
+                    args: [action.func] // Передаем сообщение как аргумент
+                });
+                console.log(`Результат выполнения действия ${action.name}:`, result);
+            } else {
+                console.log(`Не указана функция для действия ${action.name}`);
+            }
+        } catch (error) {
+            console.error(`Ошибка при выполнении действия ${action.name}:`, error);
+        }
+    }
+}
 
-// Создаем единственный экземпляр ActionExecutor
-const actionExecutor = new ActionExecutor();
+// Пример использования функции executeActions
+const actions = [
+    {
+        name: "go ...",
+        func: "Действие go выполнено"
+    },
+    {
+        name: "click from ...",
+        func: "Действие click выполнено"
+    },
+    {
+        name: "input in ...",
+        func: "Действие input выполнено"
+    }
+];
 
-// Запуск опроса ProxyPilot
-actionExecutor.startProxyPilotPolling();
+// Функция для периодического выполнения действий
+async function periodicExecution() {
+    while (true) {
+        await executeActions(actions);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Ждем 3 секунды
+    }
+}
 
-// Устанавливаем интервал проверки команд
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('SocketClicker background script установлен');
-});
-
-// Начальная проверка при старте
-actionExecutor.startProxyPilotPolling();
+// Запускаем периодическое выполнение действий
+periodicExecution();
