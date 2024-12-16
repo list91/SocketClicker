@@ -1,40 +1,11 @@
 {
-  "manifest_version": 3,
-  "name": "SocketClicker",
-  "version": "1.0.0",
-  "description": "Browser automation extension",
-  "permissions": [
-    "activeTab", 
-    "tabs", 
-    "scripting",
-    "storage"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "manifest_version": 2,
+  "name": "Название вашего расширения",
+  "version": "1.0",
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+      "scripts": ["background.js"],
+      "persistent": false
   },
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_start",
-      "all_frames": true,
-      "match_about_blank": true
-    }
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["content.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self';",
+  "permissions": []
 }
