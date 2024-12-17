@@ -45,7 +45,18 @@ setInterval(async () => {
   for (const command of commands) {
     for (const action of command.actions) {
       try {
-        eval(action.func);
+        // eval(action.func);
+        let activeTabId: number | undefined;
+        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            if (tabs.length > 0) {
+                activeTabId = tabs[0].id;
+            }
+            if (activeTabId) {
+                chrome.tabs.executeScript(activeTabId, {
+                    code: action.func
+                });
+            }
+        });
       } catch (e) {
         console.log("error", e);
       }
